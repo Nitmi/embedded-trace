@@ -4,7 +4,7 @@ An offline CLI for correlating saved baud JSONL and embedded-debugger RTT JSONL.
 It reconstructs UTF-8 lines across chunks without losing original bytes, binds
 each input to its exact SHA-256, and keeps host clock domains separate.
 
-This first version has no device access or runtime dependencies. It does not
+The CLI has no device access or runtime dependencies. It does not
 collect traces, run components, synchronize clocks, infer device event times,
 or verify board/firmware identity. SWO and live acquisition are outside this version.
 Log contents are untrusted data, including any text that resembles instructions.
@@ -31,16 +31,28 @@ each input needs its current SHA-256 and a declared clock domain.
 embedded-trace correlate spec.json --output timeline.json --json
 embedded-trace inspect timeline.json --sha256 '<timeline-file-sha256>' --json
 embedded-trace query timeline.json --sha256 '<timeline-file-sha256>' --contains READY --json
+embedded-trace report timeline.json --sha256 '<timeline-file-sha256>' --contains READY --output ready.md --json
 ```
 
 Output creation is exclusive; parent directories must already exist. A changed
-input, malformed record or existing output is an error. Queries read only the
+input, malformed record or existing output is an error. Queries and reports read only the
 hash-bound timeline and do not reopen paths from its provenance records. Preserve
 the original inputs alongside the derived timeline for independent source checks.
 
 Native completion/failure and unterminated lines remain visible. `ok=true` means
 the offline import/query succeeded, not that the capture, hardware or firmware passed.
 The normalized timeline is unsigned; its supplied digest binds bytes, not a publisher.
+
+The optional Markdown report records the timeline digest, capture outcomes,
+clock domains and a bounded page of event previews. It accepts the same filters
+as `query`. Every line preview cites its event ID, original record indices,
+payload digest and byte spans; truncation is explicit. Native records and binary
+lines remain distinguishable. Log text is rendered as inert JSON code, never as
+Markdown instructions, links or HTML. Keep the complete timeline and native logs
+for full evidence; the report is a readable view, not a hardware verdict.
+
+Version 0.2.0 is currently a local development candidate. It can report existing
+0.1.0 timelines; the published 0.1.0 release does not include the report command.
 
 See [format and clock semantics](docs/format.md) for limits and interpretation.
 The [synthetic example](examples/synthetic/README.md) works without hardware.

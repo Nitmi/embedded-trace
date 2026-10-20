@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -21,6 +22,8 @@ def main() -> None:
     wheels = list(args.dist_dir.glob("*.whl"))
     assert len(wheels) == 1, "expected one built wheel"
     wheel = wheels[0].resolve()
+    project_root = Path(__file__).resolve().parents[1]
+    version = tomllib.loads((project_root / "pyproject.toml").read_text())["project"]["version"]
     root = args.output_dir.absolute()
     root.mkdir()
     environment = os.environ.copy()
@@ -74,10 +77,12 @@ def main() -> None:
             ],
         )
     )
-    assert identity["version"] == "0.1.0" and Path(identity["path"]).is_relative_to(venv)
-    assert run("launcher-version", [str(launcher), "--version"]).strip() == "embedded-trace 0.1.0"
+    assert identity["version"] == version and Path(identity["path"]).is_relative_to(venv)
+    assert (
+        run("launcher-version", [str(launcher), "--version"]).strip() == f"embedded-trace {version}"
+    )
     run("help", [str(python), "-I", "-m", "embedded_trace", "--help"])
-    fixture = Path(__file__).resolve().parents[1] / "examples/synthetic"
+    fixture = project_root / "examples/synthetic"
     inputs = root / "inputs"
     shutil.copytree(fixture, inputs)
     timeline = root / "timeline.json"
@@ -138,6 +143,45 @@ def main() -> None:
     assert refused["error"]["code"] == "OUTPUT_EXISTS" and timeline.read_bytes() == original
     source = inputs / "serial.jsonl"
     source.write_bytes(source.read_bytes() + b" ")
+    markdown = root / "report.md"
+    rendered = json.loads(
+        run(
+            "report",
+            [
+                *cli,
+                "report",
+                str(timeline),
+                "--sha256",
+                sha,
+                "--contains",
+                "READY",
+                "--output",
+                str(markdown),
+                "--json",
+            ],
+        )
+    )
+    assert rendered["data"]["selected_count"] == 1
+    assert rendered["data"]["source_files_rechecked"] is False
+    assert hashlib.sha256(markdown.read_bytes()).hexdigest() == rendered["data"]["output"]["sha256"]
+    assert '"text_preview": "READY"' in markdown.read_text()
+    report_error = json.loads(
+        run(
+            "report-overwrite",
+            [
+                *cli,
+                "report",
+                str(timeline),
+                "--sha256",
+                sha,
+                "--output",
+                str(markdown),
+                "--json",
+            ],
+            2,
+        )
+    )
+    assert report_error["error"]["code"] == "OUTPUT_EXISTS"
     drift = root / "never-created.json"
     error = json.loads(
         run(
@@ -154,8 +198,8 @@ def main() -> None:
             if item.filename.startswith("embedded_trace/") and not item.is_dir():
                 assert (package.parent / item.filename).read_bytes() == archive.read(item)
                 verified += 1
-    assert verified == 12  # Nine modules and three schemas; no runtime dependency.
-    for value in (correlated, inspected, found, overlapped):
+    assert verified == 13  # Ten modules and three schemas; no runtime dependency.
+    for value in (correlated, inspected, found, overlapped, rendered):
         assert value["hardware_access"] is False and value["executables_started"] is False
         assert value["cross_source_clock_alignment_verified"] is False
     result = {

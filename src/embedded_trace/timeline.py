@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from . import __version__
 from .adapters import baud, records, rtt
 from .common import (
     ID,
@@ -109,7 +110,7 @@ def correlate(path: Path) -> dict:
     domains = sorted({source["clock_domain"] for source in sources})
     return {
         "schema_version": "embedded-trace.timeline.v1",
-        "producer_version": "0.1.0",
+        "producer_version": __version__,
         "scope": "host_only_saved_log_correlation",
         **SAFETY,
         "status": "correlated_with_warnings"

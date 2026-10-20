@@ -7,6 +7,7 @@ from pathlib import Path
 from . import __version__
 from .common import TraceError, json_bytes, write_new
 from .query import inspect, query, validate
+from .report import report
 from .timeline import SAFETY, correlate
 
 
@@ -18,12 +19,14 @@ def parser() -> argparse.ArgumentParser:
     build.add_argument("input", type=Path)
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--json", action="store_true")
-    for name in ("inspect", "query"):
+    for name in ("inspect", "query", "report"):
         item = commands.add_parser(name)
         item.add_argument("input", type=Path)
         item.add_argument("--sha256", required=True)
         item.add_argument("--json", action="store_true")
-        if name == "query":
+        if name == "report":
+            item.add_argument("--output", type=Path, required=True)
+        if name in ("query", "report"):
             item.add_argument("--contains")
             item.add_argument("--source")
             item.add_argument("--clock-domain", dest="domain")
@@ -56,9 +59,11 @@ def main(argv: list[str] | None = None) -> int:
         elif args.operation == "inspect":
             data = inspect(args.input, args.sha256)
         else:
-            data = query(
+            operation = report if args.operation == "report" else query
+            data = operation(
                 args.input,
                 args.sha256,
+                **({"output": args.output} if args.operation == "report" else {}),
                 **{
                     key: getattr(args, key)
                     for key in ("contains", "source", "domain", "since", "until", "offset", "limit")

@@ -6,7 +6,7 @@
   "required": ["schema_version", "operation", "ok", "scope", "hardware_access", "executables_started", "authorization_granted", "hardware_identity_verified", "runtime_firmware_identity_verified", "cross_source_clock_alignment_verified", "target_event_time_verified"],
   "properties": {
     "schema_version": {"const": "embedded-trace.result.v1"},
-    "operation": {"enum": ["trace.correlate", "trace.inspect", "trace.query"]},
+    "operation": {"enum": ["trace.correlate", "trace.inspect", "trace.query", "trace.report"]},
     "ok": {"type": "boolean"},
     "scope": {"const": "host_only_saved_log_correlation"},
     "hardware_access": {"const": false},

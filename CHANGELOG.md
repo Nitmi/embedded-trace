@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 — Unreleased
+
+- Export deterministic Markdown from one SHA-256-bound validated timeline.
+- Reuse query filters, clock domains and pagination without reopening native inputs.
+- Cite original records, payload hashes and byte spans; label all preview truncation.
+- Preserve failed/partial capture outcomes, binary lines and unterminated fragments.
+- Render log excerpts as inert ASCII JSON, with bounded previews and a 1 MiB output cap.
+- Verify the report CLI in isolated dependency-free wheel installations.
+
 ## 0.1.0 — 2026-10-20
 
 - Correlate saved baud and embedded-debugger RTT JSONL into hash-bound timelines.

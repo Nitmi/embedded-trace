@@ -64,7 +64,7 @@ not used to manufacture a wall-time alignment.
 
 ## Query and verification
 
-`inspect` and `query` require the exact timeline file SHA-256 and validate its
+`inspect`, `query` and `report` require the exact timeline file SHA-256 and validate its
 layout, IDs, ordering, line bytes/hashes/views and spans. They do not reopen source
 paths; `source_files_rechecked=false` states this explicitly. Keep native inputs
 with the timeline to re-run correlation after checking their hashes independently.
@@ -78,6 +78,34 @@ Source/domain filters can be combined. Pagination is by filtered event index;
 the same bound timeline yields stable pages. The JSON envelope always keeps
 hardware, authorization, clock-alignment and runtime-identity claims false.
 
+## Markdown reports
+
+`report --output report.md` selects the same page as `query`, using the same
+`--contains`, `--source`, `--clock-domain`, `--since`, `--until`, `--offset` and
+`--limit` arguments. The default page contains up to 20 events, including native
+metadata events. `--contains` selects text lines only. Empty pages are valid.
+
+The Markdown includes the timeline's exact file digest and producer version,
+source digests, declared clock domains, native capture outcomes and warning
+previews. A line excerpt includes its event ID/source ordinal, native record
+indices, host recording envelope, stream, full payload digest and length,
+completion/boundary markers and byte-span references. No timestamp is added at
+render time: identical timeline bytes, path and filters produce identical reports.
+Existing 0.1.0 timelines are supported without rewriting their producer version.
+
+Each text, base64, warning JSON or native JSON preview is limited to 512
+characters; only the first 8 byte spans per line are shown. Individual truncation
+flags and full segment counts distinguish previews from full evidence. A preview
+of serialized native/warning JSON can end mid-string and is labelled as a preview,
+not a separate parseable native record. Native metadata stays available in full
+in the bound timeline. Event pagination is independent of preview truncation.
+
+All data values are rendered inside indented code blocks as ASCII JSON. Escaped
+control/Unicode characters and indented log text cannot close a Markdown fence,
+inject headings, activate HTML or create links. Consumers must still treat log
+content as untrusted evidence, never instructions. Reports do not recheck native
+inputs, establish producer authenticity or declare hardware/runtime acceptance.
+
 ## Bounds and writes
 
 At most 8 sources; 8 MiB per source, 16 MiB total source bytes, 20,000 total native
@@ -85,8 +113,9 @@ records and normalized events, 128 KiB per JSONL record, 64 KiB per reconstructe
 line, JSON depth 32, and 64 MiB per normalized output/input timeline. RTT additionally
 keeps its native 4,096 chunks, 4 KiB per chunk and 1 MiB payload maximum.
 Queries return at most 100 events per page with a 512-character text filter.
+Reports use the same page bounds and reject outputs larger than 1 MiB.
 
-Only `correlate --output` writes a derived file, with exclusive creation after
+`correlate --output` and `report --output` write derived files, with exclusive creation after
 input checks finish. Parent directories must already exist; existing outputs are
 never overwritten. An I/O failure can retain a partial new output for diagnosis.
 Exit 0 means successful offline processing, 2 means invalid inputs or a refused

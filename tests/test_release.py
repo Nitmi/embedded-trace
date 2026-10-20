@@ -31,6 +31,7 @@ MODULES = (
     "common.py",
     "framing.py",
     "query.py",
+    "report.py",
     "timeline.py",
 )
 
@@ -112,7 +113,7 @@ def test_verify_binds_bytes_but_does_not_claim_publisher_authentication(tmp_path
     monkeypatch.setattr(release.subprocess, "run", forbidden)
     report = release.verify(tmp_path, REVISION)
     assert report["ok"] and report["source_revision"] == REVISION
-    assert report["wheel_members"] == 17 and report["source_members"] == 16
+    assert report["wheel_members"] == 18 and report["source_members"] == 17
     assert not report["executables_started"] and not report["hardware_access"]
     assert not report["publisher_authenticity_verified"]
     with pytest.raises(ValueError, match="Source revision differs"):

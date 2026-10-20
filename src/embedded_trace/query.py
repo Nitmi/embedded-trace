@@ -330,6 +330,33 @@ def query(
     offset: int = 0,
     limit: int = 20,
 ) -> dict:
+    document, ref = load(path, sha256)
+    return select_events(
+        document,
+        ref,
+        contains=contains,
+        source=source,
+        domain=domain,
+        since=since,
+        until=until,
+        offset=offset,
+        limit=limit,
+    )
+
+
+def select_events(
+    document: dict,
+    ref: dict,
+    *,
+    contains: str | None = None,
+    source: str | None = None,
+    domain: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> dict:
+    """Select from an already validated snapshot without reopening any files."""
     integer(offset, "offset", 0, MAX_EVENTS)
     integer(limit, "limit", 1, 100)
     if contains is not None:
@@ -337,7 +364,6 @@ def query(
     low = unix_ns(since) if since is not None else 0
     high = unix_ns(until) if until is not None else 253402300800 * 10**9 - 1
     require(low <= high, "since must not exceed until")
-    document, ref = load(path, sha256)
     require(
         source is None or source in {entry["id"] for entry in document["sources"]},
         "unknown source filter",

@@ -154,7 +154,11 @@ def json_bytes(value: dict) -> bytes:
 
 
 def write_new(path: Path, value: dict) -> dict:
-    raw = json_bytes(value)
+    return write_new_bytes(path, json_bytes(value))
+
+
+def write_new_bytes(path: Path, raw: bytes, maximum: int = MAX_DOCUMENT_BYTES) -> dict:
+    require(len(raw) <= maximum, "output exceeds byte limit", "LIMIT_EXCEEDED")
     parent = checked_path(path.parent)
     require(parent.is_dir(), "output parent must be a directory")
     destination = relative_source(parent, path.name)

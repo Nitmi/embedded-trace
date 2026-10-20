@@ -40,6 +40,7 @@ RUNTIME_FILES = {
         "common.py",
         "framing.py",
         "query.py",
+        "report.py",
         "timeline.py",
         "schemas/input.v1.schema.json",
         "schemas/result.v1.schema.json",
