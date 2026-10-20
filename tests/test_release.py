@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import gzip
 import hashlib
 import importlib.util
 import io
@@ -274,6 +275,17 @@ def test_compressed_size_limits_apply_before_payload_use(tmp_path, monkeypatch):
     # Compressed bytes fit, but advertised decompressed contents exceed the limit.
     monkeypatch.setattr(release, "MAX_FILE", 16000)
     with pytest.raises(ValueError, match="Wheel too large"):
+        release.create_manifest(tmp_path, VERSION, REVISION)
+
+
+def test_source_limit_covers_inflated_tar_metadata_not_only_file_members(tmp_path, monkeypatch):
+    archives(tmp_path)
+    monkeypatch.setattr(release, "MAX_FILE", 16000)
+    # A tiny gzip can conceal a large tar stream even without reported members.
+    (tmp_path / release.names(VERSION)[1]).write_bytes(
+        gzip.compress(b"\0" * (16000 + 512 * 1024 + 1))
+    )
+    with pytest.raises(ValueError, match="Source tar stream too large"):
         release.create_manifest(tmp_path, VERSION, REVISION)
 
 

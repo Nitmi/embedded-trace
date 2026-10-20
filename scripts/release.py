@@ -11,6 +11,7 @@ import base64
 import configparser
 import csv
 import email.parser
+import gzip
 import hashlib
 import io
 import json
@@ -179,7 +180,13 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
         require(row[1:] == expected, "Wheel RECORD integrity differs")
     source = {}
     total = 0
-    with tarfile.open(fileobj=io.BytesIO(snapshots[source_name]), mode="r:gz") as archive:
+    # Bound the whole inflated stream before tarfile parses PAX/long-name metadata.
+    # A member-size check alone does not bound those internal metadata records.
+    tar_limit = MAX_FILE + 512 * 1024
+    with gzip.GzipFile(fileobj=io.BytesIO(snapshots[source_name])) as compressed:
+        tar_bytes = compressed.read(tar_limit + 1)
+    require(len(tar_bytes) <= tar_limit, "Source tar stream too large")
+    with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:") as archive:
         for item in archive:
             total += item.size
             require(
