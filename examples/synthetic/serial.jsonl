@@ -1,0 +1,4 @@
+{"ts":"2026-01-01T00:00:00.000Z","type":"run_started","name":"SYNTHETIC_ONLY"}
+{"ts":"2026-01-01T00:00:00.001Z","type":"recv","step":"monitor","bytes":3,"raw_base64":"UkVB","text":"REA"}
+{"ts":"2026-01-01T00:00:00.003Z","type":"recv","step":"monitor","bytes":3,"raw_base64":"RFkK","text":"DY\n"}
+{"ts":"2026-01-01T00:00:00.004Z","type":"run_finished","ok":true}

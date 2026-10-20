@@ -1,0 +1,7 @@
+{
+  "schema_version": "embedded-trace.input.v1",
+  "sources": [
+    {"id": "uart", "format": "baud-jsonl", "path": "serial.jsonl", "sha256": "1582d58fce0e178573b3f59270c8640991d974806960f5da563a4752c2bb6a94", "clock_domain": "synthetic-host"},
+    {"id": "rtt", "format": "rtt-jsonl", "path": "rtt.jsonl", "sha256": "cd894c6317691085167c055153a70aeb00988b68dd3a728fab523c2ccfd6c009", "clock_domain": "synthetic-host"}
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:embedded-trace:timeline:v1",
+  "title": "Offline host-recorded log timeline",
+  "type": "object",
+  "required": ["schema_version", "producer_version", "scope", "status", "input_spec", "ordering", "clock_domains", "sources", "event_count", "events", "hardware_access", "executables_started", "authorization_granted", "hardware_identity_verified", "runtime_firmware_identity_verified", "cross_source_clock_alignment_verified", "target_event_time_verified"],
+  "properties": {
+    "schema_version": {"const": "embedded-trace.timeline.v1"},
+    "producer_version": {"type": "string"},
+    "scope": {"const": "host_only_saved_log_correlation"},
+    "status": {"enum": ["correlated", "correlated_with_warnings"]},
+    "ordering": {"const": "clock_domain_then_minimum_host_record_time_then_source_index_then_source_ordinal"},
+    "hardware_access": {"const": false},
+    "executables_started": {"const": false},
+    "authorization_granted": {"const": false},
+    "hardware_identity_verified": {"const": false},
+    "runtime_firmware_identity_verified": {"const": false},
+    "cross_source_clock_alignment_verified": {"const": false},
+    "target_event_time_verified": {"const": false},
+    "input_spec": {"$ref": "#/$defs/reference"},
+    "clock_domains": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {"type": "object", "required": ["id", "source_ids"], "properties": {
+        "id": {"type": "string"}, "source_ids": {"type": "array", "items": {"type": "string"}}
+      }}
+    },
+    "sources": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {"type": "object", "required": ["id", "format", "clock_domain", "clock_domain_is_user_declaration", "source_index", "input", "record_count", "event_count", "payload_bytes", "warnings", "native_summary_verified", "integrity", "capture_outcome", "time_semantics"], "properties": {
+        "id": {"type": "string"}, "clock_domain": {"type": "string"},
+        "format": {"enum": ["baud-jsonl", "rtt-jsonl"]},
+        "clock_domain_is_user_declaration": {"const": true},
+        "source_index": {"type": "integer", "minimum": 0, "maximum": 7},
+        "input": {"$ref": "#/$defs/reference"},
+        "record_count": {"type": "integer", "minimum": 1, "maximum": 20000},
+        "event_count": {"type": "integer", "minimum": 0, "maximum": 20000},
+        "payload_bytes": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+        "native_summary_verified": {"const": false},
+        "integrity": {"type": "object", "required": ["input_hash_verified", "record_structure_verified", "finish_payload_hash_verified"], "properties": {
+          "input_hash_verified": {"const": true}, "record_structure_verified": {"const": true},
+          "finish_payload_hash_verified": {"type": ["boolean", "null"]}
+        }},
+        "capture_outcome": {"enum": ["succeeded", "failed", "partial"]},
+        "time_semantics": {"type": "string"}
+      }}
+    },
+    "event_count": {"type": "integer", "minimum": 0, "maximum": 20000},
+    "events": {"type": "array", "maxItems": 20000, "items": {"$ref": "#/$defs/event"}}
+  },
+  "$defs": {
+    "reference": {"type": "object", "required": ["path", "sha256", "size_bytes"], "properties": {
+      "path": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "size_bytes": {"type": "integer", "minimum": 0}
+    }},
+    "time": {"type": "object", "required": ["first_recorded_at", "last_recorded_at", "minimum_unix_ns", "maximum_unix_ns"], "properties": {
+      "first_recorded_at": {"type": "string"}, "last_recorded_at": {"type": "string"},
+      "minimum_unix_ns": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,23})$"},
+      "maximum_unix_ns": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,23})$"}
+    }},
+    "event": {
+      "type": "object", "required": ["id", "source_id", "source_ordinal", "clock_domain", "kind", "record_start", "record_end", "time"],
+      "properties": {
+        "id": {"type": "string"}, "source_id": {"type": "string"},
+        "source_ordinal": {"type": "integer", "minimum": 1},
+        "clock_domain": {"type": "string"}, "kind": {"enum": ["line", "native"]},
+        "record_start": {"type": "integer", "minimum": 1}, "record_end": {"type": "integer", "minimum": 1},
+        "time": {"$ref": "#/$defs/time"}, "native": {"type": "object"},
+        "stream": {"enum": ["serial.rx", "serial.tx", "rtt.up"]}, "step": {"type": "string"},
+        "elapsed_ms": {"type": "object", "required": ["first", "last"], "additionalProperties": {"type": ["integer", "null"]}},
+        "payload": {
+          "type": "object", "required": ["raw_base64", "length", "sha256", "text", "utf8_valid", "terminator", "complete", "boundary", "segments"],
+          "properties": {
+            "raw_base64": {"type": "string"}, "length": {"type": "integer", "minimum": 1, "maximum": 65536},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "text": {"type": ["string", "null"]},
+            "utf8_valid": {"type": "boolean"}, "terminator": {"enum": ["lf", "crlf", null]},
+            "complete": {"type": "boolean"}, "boundary": {"enum": ["newline", "step_change", "record_end", "end_of_input"]},
+            "segments": {"type": "array", "minItems": 1, "maxItems": 20000, "items": {
+              "type": "object", "required": ["record_index", "payload_byte_start", "payload_byte_end", "stream_byte_start", "stream_byte_end"],
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }}
+          }
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "native"}}}, "then": {"required": ["native"]}},
+        {"if": {"properties": {"kind": {"const": "line"}}}, "then": {"required": ["payload", "stream", "step", "elapsed_ms"]}}
+      ]
+    }
+  }
+}
