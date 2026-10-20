@@ -44,6 +44,8 @@ The normalized timeline is unsigned; its supplied digest binds bytes, not a publ
 
 See [format and clock semantics](docs/format.md) for limits and interpretation.
 The [synthetic example](examples/synthetic/README.md) works without hardware.
+See [installation and release verification](docs/installation.md) for isolated
+installation, source bindings and the planned attestation procedure.
 
 ## Development
 
@@ -53,6 +55,7 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv build
+uv run python scripts/package_smoke.py --dist-dir dist --output-dir '<new-smoke-directory>'
 ```
 
 The lock binds development dependencies; installed runtime code uses only the

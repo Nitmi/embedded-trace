@@ -14,3 +14,5 @@
 - Test chunk boundaries, time discontinuities, malformed evidence, limits and
   actual installed CLI behavior. Run tests, Ruff, formatting, package smoke and
   git diff --check before cohesive commits. Keep real private evidence out of Git.
+- Development-only packaging helpers may invoke Git/uv and installed CLI smoke
+  checks. Keep those helpers out of runtime imports; they must not access devices.
