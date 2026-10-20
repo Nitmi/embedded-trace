@@ -1,8 +1,10 @@
 # Installation and release verification
 
-The local 0.1.0 candidate is not a published or attested release. The commands
-below describe the release procedure after the public repository and tag exist.
-Do not treat a local manifest or matching checksum as publisher authentication.
+[Release 0.1.0](https://github.com/Nitmi/embedded-trace/releases/tag/v0.1.0)
+is published from source commit `ba5e88e4ef94bee15b3530f5274248fdb6c307d3`.
+The tag workflow completed CI, two identical builds, an isolated install check
+and provenance signing. Authenticate downloaded assets before installation;
+a manifest or matching checksum alone is not publisher authentication.
 
 ## Release files
 
@@ -28,14 +30,14 @@ commit independently from the reviewed release/tag, not just from the manifest.
 For **each** asset run the following, substituting its path and the exact commit:
 
 ```powershell
-gh attestation verify '<asset>' --repo Nitmi/embedded-trace --source-ref refs/tags/v0.1.0 --source-digest '<expected-40-character-commit>' --signer-digest '<expected-40-character-commit>' --cert-identity 'https://github.com/Nitmi/embedded-trace/.github/workflows/python-release.yml@refs/tags/v0.1.0' --deny-self-hosted-runners --predicate-type https://slsa.dev/provenance/v1
+gh attestation verify '<asset>' --repo Nitmi/embedded-trace --source-ref refs/tags/v0.1.0 --source-digest ba5e88e4ef94bee15b3530f5274248fdb6c307d3 --signer-digest ba5e88e4ef94bee15b3530f5274248fdb6c307d3 --cert-identity 'https://github.com/Nitmi/embedded-trace/.github/workflows/python-release.yml@refs/tags/v0.1.0' --deny-self-hosted-runners --predicate-type https://slsa.dev/provenance/v1
 ```
 
 Require all four verifications to succeed. Use `scripts/release.py` from the
 trusted matching source checkout to verify the complete directory afterward:
 
 ```powershell
-python scripts/release.py verify '<download-directory>' --source-revision '<expected-40-character-commit>'
+python scripts/release.py verify '<download-directory>' --source-revision ba5e88e4ef94bee15b3530f5274248fdb6c307d3
 ```
 
 This verifier uses only standard-library file/archive parsing. It never extracts,

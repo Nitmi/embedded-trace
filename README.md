@@ -59,4 +59,6 @@ uv run python scripts/package_smoke.py --dist-dir dist --output-dir '<new-smoke-
 ```
 
 The lock binds development dependencies; installed runtime code uses only the
-standard library. This local first version has no public release yet.
+standard library. [Release 0.1.0](https://github.com/Nitmi/embedded-trace/releases/tag/v0.1.0)
+provides a wheel, source archive, source-bound manifest and checksums. Follow the
+installation guide to authenticate all four assets before installing the wheel.
