@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "embedded-trace"
-version = "0.2.0"
+version = "0.3.0"
 description = "Offline, provenance-bound serial and RTT log timelines for embedded agents"
 readme = "README.md"
 requires-python = ">=3.11"

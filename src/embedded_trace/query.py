@@ -65,7 +65,15 @@ def validate(document: dict) -> None:
         require(
             integer(source.get("source_index"), "source index") == index, "invalid source ordering"
         )
-        require(source.get("format") in ("baud-jsonl", "rtt-jsonl"), "invalid source format")
+        simulation = source.get("format") == "sim-runner-report"
+        extra_bytes = integer(
+            source.get("extra_input_bytes", 0), "extra evidence bytes", 0, MAX_SOURCE_BYTES
+        )
+        require(simulation or extra_bytes == 0, "unexpected extra bytes on a device capture")
+        require(
+            source.get("format") in ("baud-jsonl", "rtt-jsonl", "sim-runner-report"),
+            "invalid source format",
+        )
         require(
             source.get("capture_outcome") in ("succeeded", "failed", "partial"),
             "invalid capture outcome",
@@ -90,20 +98,99 @@ def validate(document: dict) -> None:
             "invalid source integrity fields",
         )
         expected_finish = (
-            None if source["format"] == "baud-jsonl" else source["capture_outcome"] == "succeeded"
+            None if source["format"] != "rtt-jsonl" else source["capture_outcome"] == "succeeded"
         )
         require(
             integrity.get("finish_payload_hash_verified") is expected_finish,
             "invalid finish integrity claim",
         )
         text(source.get("time_semantics"), "time semantics", 128)
+        if simulation:
+            require(
+                source.get("execution_kind") == "simulation"
+                and source.get("physical_board_verified") is False
+                and source.get("native_assertions_reexecuted") is False
+                and integrity.get("saved_artifacts_hash_verified") is True,
+                "invalid simulation provenance",
+            )
+            require(
+                source.get("time_semantics") == "simulation_run_host_window_not_uart_event_time",
+                "invalid simulation time semantics",
+            )
+            require(
+                source.get("recorded_status")
+                == ("passed" if source["capture_outcome"] == "succeeded" else "failed"),
+                "simulation verdict changed",
+            )
+            refs = source.get("evidence_inputs")
+            require(
+                isinstance(refs, dict) and 4 <= len(refs) <= 9,
+                "invalid simulation evidence references",
+            )
+            for ref in refs.values():
+                reference(ref, MAX_SOURCE_BYTES)
+            require(
+                integer(
+                    source.get("extra_input_bytes"), "extra evidence bytes", 0, MAX_SOURCE_BYTES
+                )
+                == sum(ref["size_bytes"] for ref in refs.values()),
+                "evidence byte budget differs",
+            )
+            require(
+                source["input"]["size_bytes"] + source["extra_input_bytes"] <= MAX_SOURCE_BYTES,
+                "simulation evidence exceeds byte budget",
+            )
+            saved = source.get("saved_records")
+            require(
+                isinstance(saved, list) and len(saved) == source["record_count"],
+                "invalid saved file records",
+            )
+            for ordinal, item in enumerate(saved, 1):
+                require(
+                    isinstance(item, dict) and item.get("index") == ordinal,
+                    "invalid saved file record index",
+                )
+                integer(
+                    item.get("byte_end"),
+                    "saved byte end",
+                    integer(item.get("byte_start"), "saved byte start"),
+                    MAX_SOURCE_BYTES,
+                )
+            require(
+                saved[0]
+                == {
+                    "index": 1,
+                    "artifact": "selected_report",
+                    "byte_start": 0,
+                    "byte_end": source["input"]["size_bytes"],
+                },
+                "report container differs",
+            )
+            cursor = 0
+            for item in saved[1:]:
+                require(
+                    "uart.bin" in refs
+                    and item.get("artifact") == "uart.bin"
+                    and item["byte_start"] == cursor
+                    and item["byte_end"] - cursor <= 65536,
+                    "UART file container differs",
+                )
+                cursor = item["byte_end"]
+            require(
+                (len(saved) > 1) is ("uart.bin" in refs)
+                and cursor == refs.get("uart.bin", {}).get("size_bytes", 0),
+                "UART file container coverage differs",
+            )
         source_map[identity] = source
         ordinals[identity] = set()
         native_records[identity] = set()
         native_bytes[identity] = 0
     require(
         sum(source["record_count"] for source in sources) <= MAX_RECORDS
-        and sum(source["input"]["size_bytes"] for source in sources) <= MAX_TOTAL_BYTES,
+        and sum(
+            source["input"]["size_bytes"] + source.get("extra_input_bytes", 0) for source in sources
+        )
+        <= MAX_TOTAL_BYTES,
         "source totals exceed limits",
     )
     require(
@@ -123,6 +210,16 @@ def validate(document: dict) -> None:
         for domain in sorted({source["clock_domain"] for source in sources})
     ]
     require(document.get("clock_domains") == expected_domains, "clock domains differ")
+    for source in sources:
+        require(
+            all(
+                (other["format"] == "sim-runner-report")
+                == (source["format"] == "sim-runner-report")
+                for other in sources
+                if other["clock_domain"] == source["clock_domain"]
+            ),
+            "simulation and device captures share a clock domain",
+        )
     events = document.get("events")
     require(isinstance(events, list) and len(events) <= MAX_EVENTS, "invalid timeline events")
     require(
@@ -183,7 +280,13 @@ def validate(document: dict) -> None:
         require(event.get("kind") == "line", "invalid event kind")
         require(
             event.get("stream")
-            in (("serial.rx", "serial.tx") if source["format"] == "baud-jsonl" else ("rtt.up",)),
+            in (
+                {
+                    "baud-jsonl": ("serial.rx", "serial.tx"),
+                    "rtt-jsonl": ("rtt.up",),
+                    "sim-runner-report": ("simulation.uart",),
+                }[source["format"]]
+            ),
             "invalid stream",
         )
         text(event.get("step"), "step")
@@ -193,13 +296,17 @@ def validate(document: dict) -> None:
             isinstance(elapsed, dict) and set(elapsed) == {"first", "last"},
             "invalid line elapsed time",
         )
-        if source["format"] == "baud-jsonl":
+        if source["format"] != "rtt-jsonl":
             require(
                 elapsed["first"] is None and elapsed["last"] is None,
                 "baud has no elapsed capture clock",
             )
         else:
             integer(elapsed["last"], "last elapsed", integer(elapsed["first"], "first elapsed"))
+        if source["format"] == "sim-runner-report":
+            require(
+                timing == source.get("host_window"), "simulation event is not the host run window"
+            )
         require(isinstance(payload, dict), "invalid line payload")
         raw = decode_base64(payload.get("raw_base64"))
         require(
@@ -274,6 +381,28 @@ def validate(document: dict) -> None:
             (event for event in events if event["source_id"] == source["id"]),
             key=lambda event: event["source_ordinal"],
         )
+        if source["format"] == "sim-runner-report":
+            metadata = [e for e in local if e["kind"] == "native" and e["record_start"] == 1]
+            require(
+                len(metadata) == 1
+                and metadata[0]["native"].get("status") == source["recorded_status"],
+                "simulation native verdict differs",
+            )
+            report = metadata[0]["native"]
+            require(
+                report.get("execution_kind") == "simulation"
+                and report.get("hardware_access") is False
+                and report.get("physical_board_verified") is False,
+                "simulation metadata relabeled",
+            )
+            raw_uart = b"".join(
+                decode_base64(e["payload"]["raw_base64"]) for e in local if e["kind"] == "line"
+            )
+            if "uart.bin" in source["evidence_inputs"]:
+                require(
+                    digest(raw_uart) == source["evidence_inputs"]["uart.bin"]["sha256"],
+                    "saved UART hash differs",
+                )
         require(
             [event["record_end"] for event in local]
             == sorted(event["record_end"] for event in local),

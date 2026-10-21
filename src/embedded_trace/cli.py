@@ -12,7 +12,9 @@ from .timeline import SAFETY, correlate
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(description="Offline, hash-bound serial and RTT log timelines.")
+    root = argparse.ArgumentParser(
+        description="Offline, hash-bound serial, RTT and simulation timelines."
+    )
     root.add_argument("--version", action="version", version=f"embedded-trace {__version__}")
     commands = root.add_subparsers(dest="operation", required=True)
     build = commands.add_parser("correlate", help="correlate explicitly selected saved logs")

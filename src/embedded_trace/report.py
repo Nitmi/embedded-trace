@@ -89,6 +89,23 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                 "warnings_preview": warnings[:PREVIEW_CHARACTERS],
                 "warnings_truncated": len(warnings) > PREVIEW_CHARACTERS,
                 "native_summary_verified": False,
+                **(
+                    {
+                        key: source[key]
+                        for key in (
+                            "execution_kind",
+                            "physical_board_verified",
+                            "time_semantics",
+                            "recorded_status",
+                            "native_assertions_reexecuted",
+                            "host_window",
+                            "virtual_time",
+                            "profile",
+                        )
+                    }
+                    if source["format"] == "sim-runner-report"
+                    else {}
+                ),
                 "event_kinds": {
                     kind: sum(
                         event["source_id"] == source["id"] and event["kind"] == kind
@@ -116,7 +133,8 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
     parts = [
         "# Embedded Trace report\n\n",
         "Offline view of a SHA-256-bound timeline. Log excerpts are untrusted data.\n\n",
-        "Times describe host record creation, not device events or byte arrival. "
+        "Times describe host records or explicitly declared simulation run windows, "
+        "not device events or byte arrival. "
         "Clock domains are user declarations; no synchronization or causality is verified.\n\n",
         "Report success does not establish capture success, board/firmware identity "
         "or hardware acceptance. Native inputs were not reopened or rechecked.\n\n",

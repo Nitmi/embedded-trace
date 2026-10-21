@@ -16,6 +16,8 @@ from .common import (
     require,
     text,
 )
+from .simulation import FORMAT as SIM_FORMAT
+from .simulation import import_report
 
 SAFETY = {
     "hardware_access": False,
@@ -58,7 +60,9 @@ def correlate(path: Path) -> dict:
             "invalid or duplicate source ID",
         )
         require(ID.fullmatch(domain) is not None, "invalid clock domain")
-        require(entry["format"] in ("baud-jsonl", "rtt-jsonl"), "unsupported source format")
+        require(
+            entry["format"] in ("baud-jsonl", "rtt-jsonl", SIM_FORMAT), "unsupported source format"
+        )
         require(
             isinstance(entry["sha256"], str) and SHA.fullmatch(entry["sha256"]) is not None,
             "source requires a lowercase SHA-256",
@@ -70,9 +74,7 @@ def correlate(path: Path) -> dict:
         paths.add(reference["path"])
         total += len(payload)
         require(total <= MAX_TOTAL_BYTES, "total source bytes exceed limit", "LIMIT_EXCEEDED")
-        rows = records(payload)
-        record_count += len(rows)
-        require(record_count <= MAX_RECORDS, "total source records exceed limit", "LIMIT_EXCEEDED")
+        rows = [] if entry["format"] == SIM_FORMAT else records(payload)
         source = {
             "id": identity,
             "format": entry["format"],
@@ -88,7 +90,13 @@ def correlate(path: Path) -> dict:
             "integrity": {"input_hash_verified": True, "record_structure_verified": True},
         }
         start = len(events)
-        (baud if entry["format"] == "baud-jsonl" else rtt)(rows, source, events)
+        if entry["format"] == SIM_FORMAT:
+            total += import_report(payload, source_path, source, events)
+        else:
+            (baud if entry["format"] == "baud-jsonl" else rtt)(rows, source, events)
+        require(total <= MAX_TOTAL_BYTES, "total evidence bytes exceed limit", "LIMIT_EXCEEDED")
+        record_count += source["record_count"]
+        require(record_count <= MAX_RECORDS, "total source records exceed limit", "LIMIT_EXCEEDED")
         local = sorted(
             events[start:], key=lambda event: (event["record_end"], event["source_ordinal"])
         )
@@ -98,6 +106,15 @@ def correlate(path: Path) -> dict:
         if source["capture_outcome"] != "succeeded":
             source["warnings"]["capture_" + source["capture_outcome"]] = 1
         sources.append(source)
+    for source in sources:
+        require(
+            all(
+                (other["format"] == SIM_FORMAT) == (source["format"] == SIM_FORMAT)
+                for other in sources
+                if other["clock_domain"] == source["clock_domain"]
+            ),
+            "simulation and device captures require distinct clock domains",
+        )
     indexes = {source["id"]: source["source_index"] for source in sources}
     events.sort(
         key=lambda event: (

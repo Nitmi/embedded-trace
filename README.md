@@ -1,5 +1,11 @@
 # Embedded Trace
 
+Local 0.3.0 candidate adds offline `sim-runner-report` input alongside saved
+baud/RTT logs. [Simulation evidence](docs/simulation.md) retains the recorded
+native verdict, exact artifact bindings and UART file spans. Simulation and
+device captures use separate clock domains; report/query success never promotes
+a failed simulation to acceptance. Existing serial/RTT formats remain supported.
+
 An offline CLI for correlating saved baud JSONL and embedded-debugger RTT JSONL.
 It reconstructs UTF-8 lines across chunks without losing original bytes, binds
 each input to its exact SHA-256, and keeps host clock domains separate.

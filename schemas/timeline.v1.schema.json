@@ -28,7 +28,7 @@
       "type": "array", "minItems": 1, "maxItems": 8,
       "items": {"type": "object", "required": ["id", "format", "clock_domain", "clock_domain_is_user_declaration", "source_index", "input", "record_count", "event_count", "payload_bytes", "warnings", "native_summary_verified", "integrity", "capture_outcome", "time_semantics"], "properties": {
         "id": {"type": "string"}, "clock_domain": {"type": "string"},
-        "format": {"enum": ["baud-jsonl", "rtt-jsonl"]},
+        "format": {"enum": ["baud-jsonl", "rtt-jsonl", "sim-runner-report"]},
         "clock_domain_is_user_declaration": {"const": true},
         "source_index": {"type": "integer", "minimum": 0, "maximum": 7},
         "input": {"$ref": "#/$defs/reference"},
@@ -66,7 +66,7 @@
         "clock_domain": {"type": "string"}, "kind": {"enum": ["line", "native"]},
         "record_start": {"type": "integer", "minimum": 1}, "record_end": {"type": "integer", "minimum": 1},
         "time": {"$ref": "#/$defs/time"}, "native": {"type": "object"},
-        "stream": {"enum": ["serial.rx", "serial.tx", "rtt.up"]}, "step": {"type": "string"},
+        "stream": {"enum": ["serial.rx", "serial.tx", "rtt.up", "simulation.uart"]}, "step": {"type": "string"},
         "elapsed_ms": {"type": "object", "required": ["first", "last"], "additionalProperties": {"type": ["integer", "null"]}},
         "payload": {
           "type": "object", "required": ["raw_base64", "length", "sha256", "text", "utf8_valid", "terminator", "complete", "boundary", "segments"],
