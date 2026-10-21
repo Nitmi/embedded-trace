@@ -25,12 +25,15 @@ from .common import (
     text,
 )
 from .simulation import (
-    FLASH_PROFILE,
+    FLASH_PROFILES,
     GPIO_FIELDS,
     GPIO_PROFILE,
     OUTCOMES,
+    S3_FIELDS,
+    S3_PROFILE,
     gpio_summary,
     model_limits,
+    s3_summary,
     validate_gpio_spans,
 )
 from .timeline import ORDERING, SAFETY
@@ -78,7 +81,7 @@ def validate(document: dict) -> None:
             integer(source.get("source_index"), "source index") == index, "invalid source ordering"
         )
         simulation = source.get("format") == "sim-runner-report"
-        flash = simulation and source.get("profile") == FLASH_PROFILE
+        flash = simulation and source.get("profile") in FLASH_PROFILES
         budget = MAX_FLASH_SOURCE_BYTES if flash else MAX_SOURCE_BYTES
         extra_bytes = integer(source.get("extra_input_bytes", 0), "extra evidence bytes", 0, budget)
         require(simulation or extra_bytes == 0, "unexpected extra bytes on a device capture")
@@ -421,11 +424,24 @@ def validate(document: dict) -> None:
                 and report.get("profile") == source["profile"],
                 "simulation metadata relabeled",
             )
-            if source["profile"] == FLASH_PROFILE:
+            if source["profile"] in FLASH_PROFILES:
                 require(
-                    report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
-                    and all(source.get(k) == v for k, v in model_limits(report).items()),
+                    report.get("schema_version")
+                    == (
+                        "embedded-sim-runner.qemu-s3-flash-report.v1"
+                        if source["profile"] == S3_PROFILE
+                        else "embedded-sim-runner.qemu-flash-report.v1"
+                    )
+                    and json.dumps({k: source.get(k) for k in model_limits(report)}, sort_keys=True)
+                    == json.dumps(model_limits(report), sort_keys=True),
                     "simulation model limitations changed",
+                )
+            if source["profile"] == S3_PROFILE:
+                expected = s3_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True),
+                    "S3 identity/clock/core declarations changed",
                 )
             if source["profile"] == GPIO_PROFILE:
                 expected = gpio_summary(report)
@@ -517,6 +533,7 @@ def simulation_sources(document: dict) -> dict:
         "model_coverage_complete",
         "security_features_verified",
         *GPIO_FIELDS,
+        *S3_FIELDS,
     )
     return {
         source["id"]: {key: source[key] for key in keys if key in source}

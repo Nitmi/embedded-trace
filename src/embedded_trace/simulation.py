@@ -24,6 +24,15 @@ from .framing import Framer
 
 FORMAT = "sim-runner-report"
 FLASH_PROFILE = "esp32c3-idf-flash-v1"
+S3_PROFILE = "esp32s3-idf-flash-v1"
+FLASH_PROFILES = (FLASH_PROFILE, S3_PROFILE)
+S3_FIELDS = (
+    "backend",
+    "backend_version",
+    "runtime_archive_sha256",
+    "virtual_time",
+    "app_core_markers",
+)
 GPIO_PROFILE = "nrf52840-gpio-timer-v1"
 GPIO_LABELS = {
     "gpio_observation_semantics": "paused_model_register_snapshot_not_electrical_waveform",
@@ -130,6 +139,41 @@ def gpio_summary(report: dict) -> dict:
     }
 
 
+def s3_summary(report: dict) -> dict:
+    """Retain bounded native declarations; CPU/readiness policy remains native."""
+    require(
+        report.get("schema_version") == "embedded-sim-runner.qemu-s3-flash-report.v1"
+        and report.get("backend") == "espressif-qemu-xtensa",
+        "invalid S3 backend identity",
+    )
+    text(report.get("backend_version"), "S3 backend version", 64)
+    archive = text(report.get("runtime_archive_sha256"), "S3 archive hash", 64)
+    require(re.fullmatch(r"[0-9a-f]{64}", archive) is not None, "invalid S3 archive hash")
+    clock = report.get("virtual_time")
+    require(
+        isinstance(clock, dict)
+        and set(clock) == {"domain", "elapsed_ns", "budget_enforced"}
+        and clock["domain"] == "qemu_device_clock_unmeasured"
+        and clock["elapsed_ns"] is None
+        and clock["budget_enforced"] is False,
+        "invalid S3 unmeasured clock declaration",
+    )
+    assertions = report.get("assertions")
+    require(assertions is None or isinstance(assertions, dict), "invalid S3 assertions")
+    require(not report["ok"] or isinstance(assertions, dict), "passing S3 assertions missing")
+    cores = None if assertions is None else assertions.get("app_core_markers")
+    require(
+        assertions is None or (isinstance(cores, list) and len(cores) <= 2),
+        "invalid S3 core marker declarations",
+    )
+    if cores is not None:
+        for core in cores:
+            integer(core, "S3 app core marker", 0, 1)
+    return {key: copy.deepcopy(report[key]) for key in S3_FIELDS if key != "app_core_markers"} | {
+        "app_core_markers": None if cores is None else list(cores)
+    }
+
+
 def gpio_pattern(phase: int):
     return (
         rb"(?m)^SIM_GPIO_OBS_"
@@ -201,7 +245,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     )
     report = parse_json(raw)
     gpio = report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
-    flash = report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
+    s3 = report.get("schema_version") == "embedded-sim-runner.qemu-s3-flash-report.v1"
+    flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
         gpio or flash or qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
@@ -215,6 +260,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     profile = (
         GPIO_PROFILE
         if gpio
+        else S3_PROFILE
+        if s3
         else FLASH_PROFILE
         if flash
         else "esp32c3-ram-uart-v1"
@@ -235,7 +282,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "model.json",
             "flash-input.bin",
             "flash-work.bin",
-            "esp32c3-rom.bin",
+            "esp32s3_rev0_rom.bin" if s3 else "esp32c3-rom.bin",
             "efuse-initial.bin",
             "efuse-work.bin",
         }
@@ -303,8 +350,10 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         == (
             "embedded-sim-runner.gpio-timer-plan.v1"
             if gpio
+            else "embedded-sim-runner.qemu-s3-flash-plan.v1"
+            if s3
             else "embedded-sim-runner.qemu-flash-plan.v1"
-            if gpio or flash
+            if flash
             else "embedded-sim-runner.qemu-plan.v1"
             if qemu
             else "embedded-sim-runner.plan.v1"
@@ -336,7 +385,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         source["warnings"]["model_coverage_incomplete"] = 1
     if flash:
         require(
-            digest(loaded["esp32c3-rom.bin"]) == plan.get("rom_sha256")
+            digest(loaded["esp32s3_rev0_rom.bin" if s3 else "esp32c3-rom.bin"])
+            == plan.get("rom_sha256")
             and digest(loaded["efuse-initial.bin"]) == plan.get("efuse_initial_sha256")
             and all(
                 len(loaded[name]) == 4 * 1024 * 1024
@@ -357,6 +407,28 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "saved diagnostic count differs",
         )
         source.update(limits)
+    if s3:
+        summary = s3_summary(report)
+        runtime = parse_json(loaded["runtime-lock.json"])
+        model = parse_json(loaded["model.json"])
+        require(
+            isinstance(runtime, dict)
+            and isinstance(model, dict)
+            and isinstance(runtime.get("files"), dict),
+            "invalid S3 runtime/model document",
+        )
+        require(
+            plan.get("backend") == runtime.get("backend") == summary["backend"]
+            and plan.get("backend_version") == runtime.get("version") == summary["backend_version"]
+            and runtime.get("archive_sha256") == summary["runtime_archive_sha256"]
+            and runtime.get("executable") == "bin/qemu-system-xtensa.exe"
+            and runtime.get("files", {}).get("share/qemu/esp32s3_rev0_rom.bin")
+            == plan["rom_sha256"]
+            and model.get("profile") == profile
+            and model.get("backend") == summary["backend"],
+            "S3 runtime/ROM/model identity binding differs",
+        )
+        source.update(summary)
     first = {
         "index": 1,
         "timestamp": report.get("host_started_utc"),

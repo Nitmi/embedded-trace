@@ -1,8 +1,9 @@
 # Offline simulation evidence
 
-Version 0.5.0 accepts `sim-runner-report` in the existing trace input v1 format.
+Version 0.6.0 accepts `sim-runner-report` in the existing trace input v1 format.
 It reads a selected SHA-256-bound sim-runner 0.1/0.2/0.3 Renode report, QEMU RAM
-report, 0.3/0.4 ESP-IDF Flash report or 0.4 Renode GPIO/TIMER0 report and declared
+report, 0.3/0.4/0.5 C3 ESP-IDF Flash report, 0.4/0.5 Renode GPIO/TIMER0 report,
+or 0.5 Xtensa S3 ESP-IDF Flash report and declared
 adjacent files. It never launches sim-runner/QEMU,
 imports their code, connects to a device or follows instructions from logs.
 
@@ -20,11 +21,11 @@ imports their code, connects to a device or follows instructions from logs.
 ```
 
 Use the existing `correlate`, `inspect`, `query` and `report` commands. The optional
-HIL Runner 0.3/0.4/0.5 simulation suite emits this input automatically, including valid
+HIL Runner 0.3/0.4/0.5/0.6 simulation suite emits this input automatically, including valid
 failed native reports. No Toolkit/station update or component execution occurs.
 
 Only fixed `nrf52840-uart-v1`, `esp32c3-ram-uart-v1` and
-`esp32c3-idf-flash-v1` and `nrf52840-gpio-timer-v1` reports are supported.
+`esp32c3-idf-flash-v1`, `nrf52840-gpio-timer-v1` and `esp32s3-idf-flash-v1` reports are supported.
 Only the declared fixed basenames next to the report are opened; recorded absolute
 paths are untrusted metadata. Hashes, sizes, plan/lock/firmware/model bindings,
 simulation flags and declared successful process cleanup are checked. Missing,
@@ -105,3 +106,24 @@ coverage, alter summary/clock labels or change observation bytes/layout while
 remaining internally valid. Query/report validate the saved timeline without
 reopening sources. Span checks are saved layout/integrity checks, not signatures,
 revalidation of original byte offsets or independent model execution.
+
+## ESP32-S3 identity and clock
+
+S3's native `qemu-s3-flash-report.v1` has a distinct plan schema, backend
+`espressif-qemu-xtensa` and staged `esp32s3_rev0_rom.bin`. It uses the same 12 MiB
+Flash source budget. Import binds the recorded runtime backend/version/archive,
+Xtensa executable declaration, ROM hash and model identity to the native plan
+and report. Original executable/lock absolute paths are never opened. These
+checks preserve saved consistency; they do not authenticate the runtime or
+rerun native S3 readiness/diagnostic policy.
+
+`backend`, `backend_version`, `runtime_archive_sha256`, `virtual_time` and
+`app_core_markers` survive inspect/query/Markdown, including filtered UART views.
+Core markers are bounded native declarations; unevaluated assertions remain
+null. Host UART windows and `qemu_device_clock_unmeasured` are separate:
+`elapsed_ns=null`, `budget_enforced=false`, no borrowed C3 icount interpretation
+or invented timing measurement. Summary relabelling is rejected against the
+native metadata saved inside the timeline. Query/report still work after the
+source directory is removed. Flash diagnostics, qualified/failed outcomes and
+false coverage/security claims remain unchanged; complete SMP, debug attachment,
+Flash commands or physical behavior cannot be inferred from this view.
