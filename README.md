@@ -1,6 +1,7 @@
 # Embedded Trace
 
-Local 0.6.0 candidate adds Xtensa ESP32-S3 Flash identity, unmeasured clock and
+The published [0.6.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.6.0)
+adds Xtensa ESP32-S3 Flash identity, unmeasured clock and
 core declarations alongside Renode GPIO/TIMER0 reports with separate guest samples,
 paused model observations and raw stdout spans. It retains ESP-IDF Flash reports and explicit
 `succeeded_with_model_limits` outcomes to offline `sim-runner-report` input alongside saved
