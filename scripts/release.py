@@ -131,7 +131,12 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
             "RECORD",
         )
     }
-    require(set(wheel) == RUNTIME_FILES | expected_metadata, "Unexpected/missing wheel files")
+    runtime_files = RUNTIME_FILES | (
+        {"embedded_trace/simulation.py"}
+        if tuple(map(int, version.split("."))) >= (0, 3, 0)
+        else set()
+    )
+    require(set(wheel) == runtime_files | expected_metadata, "Unexpected/missing wheel files")
     metadata = email.parser.BytesParser().parsebytes(wheel[prefix + "METADATA"])
     require(
         metadata.get_all("Name") == ["embedded-trace"]
@@ -216,7 +221,7 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
     )
     require(source["PKG-INFO"] == wheel[prefix + "METADATA"], "Package metadata differs")
     require(source["LICENSE"] == wheel[prefix + "licenses/LICENSE"], "Package license differs")
-    for name in RUNTIME_FILES:
+    for name in runtime_files:
         target = (
             name.replace("embedded_trace/schemas/", "schemas/", 1)
             if "/schemas/" in name
