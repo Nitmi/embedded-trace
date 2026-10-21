@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from .adapters import decode_base64
@@ -23,7 +24,15 @@ from .common import (
     require,
     text,
 )
-from .simulation import FLASH_PROFILE, OUTCOMES, model_limits
+from .simulation import (
+    FLASH_PROFILE,
+    GPIO_FIELDS,
+    GPIO_PROFILE,
+    OUTCOMES,
+    gpio_summary,
+    model_limits,
+    validate_gpio_spans,
+)
 from .timeline import ORDERING, SAFETY
 
 
@@ -418,6 +427,18 @@ def validate(document: dict) -> None:
                     and all(source.get(k) == v for k, v in model_limits(report).items()),
                     "simulation model limitations changed",
                 )
+            if source["profile"] == GPIO_PROFILE:
+                expected = gpio_summary(report)
+                require(
+                    report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
+                    and json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and json.dumps(source.get("virtual_time"), sort_keys=True)
+                    == json.dumps(report.get("virtual_time"), sort_keys=True)
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "GPIO summary/coverage/clock semantics changed",
+                )
+                validate_gpio_spans(source)
             require(
                 isinstance(report.get("artifacts"), dict)
                 and set(report["artifacts"]) == set(source["evidence_inputs"])
@@ -489,9 +510,13 @@ def simulation_sources(document: dict) -> dict:
         "profile",
         "recorded_status",
         "native_assertions_reexecuted",
+        "time_semantics",
+        "host_window",
+        "virtual_time",
         "model_diagnostics",
         "model_coverage_complete",
         "security_features_verified",
+        *GPIO_FIELDS,
     )
     return {
         source["id"]: {key: source[key] for key in keys if key in source}

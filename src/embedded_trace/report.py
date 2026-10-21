@@ -8,6 +8,7 @@ from pathlib import Path
 from . import __version__
 from .common import require, write_new_bytes
 from .query import load, select_events
+from .simulation import GPIO_FIELDS, GPIO_PROFILE
 from .timeline import SAFETY
 
 MAX_REPORT_BYTES = 1024 * 1024
@@ -116,6 +117,11 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                         )
                     }
                     if source.get("profile") == "esp32c3-idf-flash-v1"
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in GPIO_FIELDS}
+                    if source.get("profile") == GPIO_PROFILE
                     else {}
                 ),
                 "event_kinds": {

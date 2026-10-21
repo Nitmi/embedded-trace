@@ -1,8 +1,9 @@
 # Offline simulation evidence
 
-Version 0.4.0 accepts `sim-runner-report` in the existing trace input v1 format.
+Version 0.5.0 accepts `sim-runner-report` in the existing trace input v1 format.
 It reads a selected SHA-256-bound sim-runner 0.1/0.2/0.3 Renode report, QEMU RAM
-report or 0.3 ESP-IDF Flash report and declared adjacent files. It never launches sim-runner/QEMU,
+report, 0.3/0.4 ESP-IDF Flash report or 0.4 Renode GPIO/TIMER0 report and declared
+adjacent files. It never launches sim-runner/QEMU,
 imports their code, connects to a device or follows instructions from logs.
 
 ```json
@@ -19,11 +20,11 @@ imports their code, connects to a device or follows instructions from logs.
 ```
 
 Use the existing `correlate`, `inspect`, `query` and `report` commands. The optional
-HIL Runner 0.3/0.4 simulation suite emits this input automatically, including valid
+HIL Runner 0.3/0.4/0.5 simulation suite emits this input automatically, including valid
 failed native reports. No Toolkit/station update or component execution occurs.
 
 Only fixed `nrf52840-uart-v1`, `esp32c3-ram-uart-v1` and
-`esp32c3-idf-flash-v1` reports are supported.
+`esp32c3-idf-flash-v1` and `nrf52840-gpio-timer-v1` reports are supported.
 Only the declared fixed basenames next to the report are opened; recorded absolute
 paths are untrusted metadata. Hashes, sizes, plan/lock/firmware/model bindings,
 simulation flags and declared successful process cleanup are checked. Missing,
@@ -72,3 +73,35 @@ The timeline can be moved and inspected/reported without the original native
 directory. Native files are checked on import, not silently reopened during
 query/report. Saved timeline inspection verifies its bound bytes and layout,
 including UART reconstruction, and is not a signature or proof of real hardware.
+
+## GPIO / TIMER0 evidence
+
+The new native `gpio-timer-report.v1` uses the Renode artifact layout and 8 MiB
+source limit. Import checks the saved plan/script binding and native coverage
+and observation labels. `gpio_evidence` retains the native `samples` and
+`model_observations` arrays, including null when assertions were not evaluated.
+Their shape and sizes are bounded; Trace does not rerun the fixed pin schedule,
+period/IRQ assertions or firmware readiness policy.
+
+For each recorded model observation, import finds the exact ASCII stdout record,
+checks its OUT/IN integers and saves `gpio_observation_spans` with byte offsets,
+raw base64 and SHA-256. Surrounding Windows locale-encoded paths/logs are never
+decoded or rewritten. The referenced artifact remains `backend.stdout.bin`.
+Guest samples remain declarations from native assertions and raw UART evidence;
+the timeline does not claim independent verification of guest code semantics.
+
+`requested_virtual_ms` is the requested paused RunFor boundary, not a measured
+UART event time. `timer_ticks` is a guest-reported 250 kHz capture in TIMER0 IRQ,
+not host time. UART line events still carry the complete host run window.
+Inspect/query/Markdown retain all three meanings, native status, both false
+`model_coverage_complete` / `physical_timing_verified` fields, the samples and
+raw observation spans even if a query selects only one UART line.
+
+A native GPIO `passed` stays `capture_outcome=succeeded`; it is not converted to
+the Flash profile's qualified-success enum. The source also carries
+`model_coverage_incomplete=1` warning, making the timeline
+`correlated_with_warnings`. A derived view cannot delete that warning, promote
+coverage, alter summary/clock labels or change observation bytes/layout while
+remaining internally valid. Query/report validate the saved timeline without
+reopening sources. Span checks are saved layout/integrity checks, not signatures,
+revalidation of original byte offsets or independent model execution.

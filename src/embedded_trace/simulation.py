@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import copy
+import re
 from pathlib import Path
 
+from .adapters import decode_base64
 from .clock import observed, unix_ns
 from .common import (
     MAX_FLASH_SOURCE_BYTES,
@@ -20,6 +24,18 @@ from .framing import Framer
 
 FORMAT = "sim-runner-report"
 FLASH_PROFILE = "esp32c3-idf-flash-v1"
+GPIO_PROFILE = "nrf52840-gpio-timer-v1"
+GPIO_LABELS = {
+    "gpio_observation_semantics": "paused_model_register_snapshot_not_electrical_waveform",
+    "timer_observation_semantics": "guest_reported_250kHz_capture_in_TIMER0_IRQ_not_host_time",
+}
+GPIO_FIELDS = (
+    "model_coverage_complete",
+    "physical_timing_verified",
+    *GPIO_LABELS,
+    "gpio_evidence",
+    "gpio_observation_spans",
+)
 OUTCOMES = {
     "passed": "succeeded",
     "passed_with_model_limits": "succeeded_with_model_limits",
@@ -66,15 +82,129 @@ def model_limits(report: dict) -> dict:
     }
 
 
+def gpio_summary(report: dict) -> dict:
+    """Check bounded saved declarations, without evaluating the native test policy."""
+    require(
+        report.get("model_coverage_complete") is False
+        and report.get("physical_timing_verified") is False
+        and all(report.get(k) == v for k, v in GPIO_LABELS.items()),
+        "invalid GPIO coverage or observation semantics",
+    )
+    assertions = report.get("assertions")
+    require(assertions is None or isinstance(assertions, dict), "invalid GPIO assertions")
+    require(not report["ok"] or isinstance(assertions, dict), "passing GPIO lacks assertions")
+    evidence = {"samples": None, "model_observations": None}
+    if assertions is not None:
+        for key, maximum, fields in (
+            (
+                "samples",
+                64,
+                ("sequence", "input", "output", "loopback", "timer_ticks", "irq_vector"),
+            ),
+            (
+                "model_observations",
+                16,
+                ("phase", "requested_virtual_ms", "out_register", "in_register"),
+            ),
+        ):
+            rows = assertions.get(key)
+            require(isinstance(rows, list) and len(rows) <= maximum, "invalid GPIO evidence rows")
+            for row in rows:
+                require(
+                    isinstance(row, dict) and set(row) == set(fields),
+                    "invalid GPIO evidence fields",
+                )
+                for field in fields:
+                    integer(
+                        row[field],
+                        field,
+                        0,
+                        1 if field in ("input", "output", "loopback") else 2**32 - 1,
+                    )
+            evidence[key] = [dict(row) for row in rows]
+    return {
+        "model_coverage_complete": False,
+        "physical_timing_verified": False,
+        **GPIO_LABELS,
+        "gpio_evidence": evidence,
+    }
+
+
+def gpio_pattern(phase: int):
+    return (
+        rb"(?m)^SIM_GPIO_OBS_"
+        + str(phase).encode("ascii")
+        + rb"\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?$"
+    )
+
+
+def gpio_spans(summary: dict, stdout: bytes) -> list:
+    spans = []
+    for row in summary["gpio_evidence"]["model_observations"] or []:
+        matches = list(re.finditer(gpio_pattern(row["phase"]), stdout))
+        require(len(matches) == 1, "GPIO model observation missing/duplicate in stdout")
+        match = matches[0]
+        require(
+            [int(v) for v in match.groups()] == [row["out_register"], row["in_register"]],
+            "GPIO model observation differs from raw stdout",
+        )
+        raw = match[0]
+        spans.append(
+            {
+                "phase": row["phase"],
+                "byte_start": match.start(),
+                "byte_end": match.end(),
+                "raw_base64": base64.b64encode(raw).decode("ascii"),
+                "sha256": digest(raw),
+            }
+        )
+    return spans
+
+
+def validate_gpio_spans(source: dict) -> None:
+    """Validate saved span layout only; query/report never reopen backend stdout."""
+    spans = source.get("gpio_observation_spans")
+    rows = source["gpio_evidence"]["model_observations"] or []
+    require(isinstance(spans, list) and len(spans) == len(rows), "invalid GPIO observation spans")
+    cursor = 0
+    phases = set()
+    for span, row in zip(spans, rows, strict=True):
+        require(
+            isinstance(span, dict)
+            and set(span) == {"phase", "byte_start", "byte_end", "raw_base64", "sha256"}
+            and span["phase"] == row["phase"]
+            and span["phase"] not in phases,
+            "invalid GPIO observation span identity",
+        )
+        integer(span["phase"], "GPIO phase", 0, 2**32 - 1)
+        phases.add(span["phase"])
+        ref = source["evidence_inputs"].get("backend.stdout.bin")
+        require(isinstance(ref, dict), "GPIO observation stdout reference missing")
+        start = integer(span["byte_start"], "GPIO span start", cursor, ref["size_bytes"])
+        end = integer(span["byte_end"], "GPIO span end", start + 1, ref["size_bytes"])
+        require(end - start <= 128, "GPIO observation span exceeds limit")
+        raw = decode_base64(span["raw_base64"])
+        match = re.fullmatch(gpio_pattern(row["phase"]), raw)
+        require(
+            len(raw) == end - start
+            and digest(raw) == span["sha256"]
+            and match is not None
+            and [int(v) for v in match.groups()] == [row["out_register"], row["in_register"]],
+            "GPIO observation span content differs",
+        )
+        cursor = end
+
+
 def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> int:
     require(
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    gpio = report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
     flash = report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        flash or qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
+        gpio or flash or qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
         "unsupported simulation report",
     )
     for key, value in BOUNDARIES.items():
@@ -82,7 +212,15 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             type(report.get(key)) is type(value) and report[key] == value,
             "invalid simulation boundary",
         )
-    profile = FLASH_PROFILE if flash else "esp32c3-ram-uart-v1" if qemu else "nrf52840-uart-v1"
+    profile = (
+        GPIO_PROFILE
+        if gpio
+        else FLASH_PROFILE
+        if flash
+        else "esp32c3-ram-uart-v1"
+        if qemu
+        else "nrf52840-uart-v1"
+    )
     require(report.get("profile") == profile, "unsupported simulation profile")
     require(
         report.get("status") in OUTCOMES
@@ -163,8 +301,10 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.qemu-flash-plan.v1"
-            if flash
+            "embedded-sim-runner.gpio-timer-plan.v1"
+            if gpio
+            else "embedded-sim-runner.qemu-flash-plan.v1"
+            if gpio or flash
             else "embedded-sim-runner.qemu-plan.v1"
             if qemu
             else "embedded-sim-runner.plan.v1"
@@ -176,6 +316,24 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             type(plan.get(key)) is type(value) and plan[key] == value,
             "invalid plan simulation boundary",
         )
+    if gpio:
+        summary = gpio_summary(report)
+        require(
+            all(
+                type(plan.get(k)) is type(v) and plan[k] == v
+                for k, v in summary.items()
+                if k != "gpio_evidence"
+            ),
+            "GPIO plan coverage/semantics differ",
+        )
+        require(
+            digest(loaded["run.resc"]) == plan.get("script_sha256"), "GPIO script binding differs"
+        )
+        source.update(summary)
+        source["gpio_observation_spans"] = gpio_spans(
+            summary, loaded.get("backend.stdout.bin", b"")
+        )
+        source["warnings"]["model_coverage_incomplete"] = 1
     if flash:
         require(
             digest(loaded["esp32c3-rom.bin"]) == plan.get("rom_sha256")
@@ -241,7 +399,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         extra_input_bytes=total,
         recorded_status=report["status"],
         native_assertions_reexecuted=False,
-        virtual_time=report.get("virtual_time"),
+        virtual_time=copy.deepcopy(report.get("virtual_time")),
         profile=profile,
         saved_records=[
             {"index": 1, "artifact": "selected_report", "byte_start": 0, "byte_end": len(raw)}
@@ -250,6 +408,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     source["integrity"].update(
         saved_artifacts_hash_verified=True, finish_payload_hash_verified=None
     )
+    if gpio:
+        validate_gpio_spans(source)
     framer = Framer(source, events)
     framer.metadata(report, last)
     uart = loaded.get("uart.bin")
