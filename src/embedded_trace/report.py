@@ -106,6 +106,18 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                     if source["format"] == "sim-runner-report"
                     else {}
                 ),
+                **(
+                    {
+                        key: source[key]
+                        for key in (
+                            "model_diagnostics",
+                            "model_coverage_complete",
+                            "security_features_verified",
+                        )
+                    }
+                    if source.get("profile") == "esp32c3-idf-flash-v1"
+                    else {}
+                ),
                 "event_kinds": {
                     kind: sum(
                         event["source_id"] == source["id"] and event["kind"] == kind

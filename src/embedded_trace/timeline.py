@@ -7,6 +7,7 @@ from .adapters import baud, records, rtt
 from .common import (
     ID,
     MAX_RECORDS,
+    MAX_SIM_TOTAL_BYTES,
     MAX_SOURCE_BYTES,
     MAX_TOTAL_BYTES,
     SHA,
@@ -46,6 +47,12 @@ def correlate(path: Path) -> dict:
     sources = []
     events: list[dict] = []
     total = 0
+    physical_total = 0
+    budget = (
+        MAX_SIM_TOTAL_BYTES
+        if any(isinstance(entry, dict) and entry.get("format") == SIM_FORMAT for entry in selected)
+        else MAX_TOTAL_BYTES
+    )
     record_count = 0
     for source_index, entry in enumerate(selected):
         require(
@@ -73,7 +80,13 @@ def correlate(path: Path) -> dict:
         require(reference["path"] not in paths, "same input path selected twice")
         paths.add(reference["path"])
         total += len(payload)
-        require(total <= MAX_TOTAL_BYTES, "total source bytes exceed limit", "LIMIT_EXCEEDED")
+        if entry["format"] != SIM_FORMAT:
+            physical_total += len(payload)
+        require(
+            total <= budget and physical_total <= MAX_TOTAL_BYTES,
+            "total source bytes exceed limit",
+            "LIMIT_EXCEEDED",
+        )
         rows = [] if entry["format"] == SIM_FORMAT else records(payload)
         source = {
             "id": identity,
@@ -94,7 +107,7 @@ def correlate(path: Path) -> dict:
             total += import_report(payload, source_path, source, events)
         else:
             (baud if entry["format"] == "baud-jsonl" else rtt)(rows, source, events)
-        require(total <= MAX_TOTAL_BYTES, "total evidence bytes exceed limit", "LIMIT_EXCEEDED")
+        require(total <= budget, "total evidence bytes exceed limit", "LIMIT_EXCEEDED")
         record_count += source["record_count"]
         require(record_count <= MAX_RECORDS, "total source records exceed limit", "LIMIT_EXCEEDED")
         local = sorted(

@@ -1,6 +1,7 @@
 # Embedded Trace
 
-Local 0.3.0 candidate adds offline `sim-runner-report` input alongside saved
+Local 0.4.0 candidate adds ESP-IDF Flash reports and explicit
+`succeeded_with_model_limits` outcomes to offline `sim-runner-report` input alongside saved
 baud/RTT logs. [Simulation evidence](docs/simulation.md) retains the recorded
 native verdict, exact artifact bindings and UART file spans. Simulation and
 device captures use separate clock domains; report/query success never promotes

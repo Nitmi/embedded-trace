@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .clock import observed, unix_ns
 from .common import (
+    MAX_FLASH_SOURCE_BYTES,
     MAX_RECORD_BYTES,
     MAX_SOURCE_BYTES,
     digest,
@@ -13,10 +14,17 @@ from .common import (
     parse_json,
     read_file,
     require,
+    text,
 )
 from .framing import Framer
 
 FORMAT = "sim-runner-report"
+FLASH_PROFILE = "esp32c3-idf-flash-v1"
+OUTCOMES = {
+    "passed": "succeeded",
+    "passed_with_model_limits": "succeeded_with_model_limits",
+    "failed": "failed",
+}
 BOUNDARIES = {
     "execution_kind": "simulation",
     "hardware_access": False,
@@ -25,14 +33,48 @@ BOUNDARIES = {
 }
 
 
+def model_limits(report: dict) -> dict:
+    """Retain bounded native declarations, without rerunning firmware assertions."""
+    require(
+        report.get("model_coverage_complete") is False
+        and report.get("security_features_verified") is False,
+        "invalid Flash coverage claim",
+    )
+    assertions = report.get("assertions")
+    diagnostics = assertions.get("model_diagnostics") if isinstance(assertions, dict) else []
+    require(isinstance(diagnostics, list) and len(diagnostics) <= 6, "invalid model diagnostics")
+    seen = set()
+    for row in diagnostics:
+        require(
+            isinstance(row, dict) and set(row) == {"message", "count", "meaning"},
+            "invalid model diagnostic",
+        )
+        message = text(row["message"], "diagnostic message", 256)
+        text(row["meaning"], "diagnostic meaning", 256)
+        integer(row["count"], "diagnostic count", 1, 256)
+        require(message and message not in seen, "duplicate/empty model diagnostic")
+        seen.add(message)
+    if report["ok"]:
+        require(
+            (report["status"] == "passed_with_model_limits") is bool(diagnostics),
+            "model diagnostic verdict mismatch",
+        )
+    return {
+        "model_diagnostics": diagnostics,
+        "model_coverage_complete": False,
+        "security_features_verified": False,
+    }
+
+
 def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> int:
     require(
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    flash = report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
+        flash or qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
         "unsupported simulation report",
     )
     for key, value in BOUNDARIES.items():
@@ -40,15 +82,27 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             type(report.get(key)) is type(value) and report[key] == value,
             "invalid simulation boundary",
         )
-    profile = "esp32c3-ram-uart-v1" if qemu else "nrf52840-uart-v1"
+    profile = FLASH_PROFILE if flash else "esp32c3-ram-uart-v1" if qemu else "nrf52840-uart-v1"
     require(report.get("profile") == profile, "unsupported simulation profile")
     require(
-        report.get("status") in ("passed", "failed")
-        and report.get("ok") is (report["status"] == "passed"),
+        report.get("status") in OUTCOMES
+        and report.get("ok") is (report["status"] != "failed")
+        and (flash or report["status"] != "passed_with_model_limits"),
         "simulation verdict mismatch",
     )
     required = (
-        {"plan.json", "runtime-lock.json", "firmware.elf", "model.json"}
+        {
+            "plan.json",
+            "runtime-lock.json",
+            "model.json",
+            "flash-input.bin",
+            "flash-work.bin",
+            "esp32c3-rom.bin",
+            "efuse-initial.bin",
+            "efuse-work.bin",
+        }
+        if flash
+        else {"plan.json", "runtime-lock.json", "firmware.elf", "model.json"}
         if qemu
         else {
             "plan.json",
@@ -70,6 +124,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     loaded = {}
     refs = {}
     total = 0
+    budget = MAX_FLASH_SOURCE_BYTES if flash else MAX_SOURCE_BYTES
     for name, record in artifacts.items():
         require(isinstance(record, dict), "invalid artifact record")
         # Never follow recorded absolute paths; only the adjacent fixed filenames.
@@ -80,7 +135,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         )
         total += len(data)
         require(
-            total + len(raw) <= MAX_SOURCE_BYTES,
+            total + len(raw) <= budget,
             "simulation evidence exceeds source byte budget",
             "LIMIT_EXCEEDED",
         )
@@ -96,17 +151,24 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         "runtime binding differs",
     )
     require(
-        digest(loaded["firmware.elf" if qemu else "firmware.bin"]) == plan["firmware"]["sha256"],
+        digest(loaded["flash-input.bin" if flash else "firmware.elf" if qemu else "firmware.bin"])
+        == plan["firmware"]["sha256"],
         "firmware binding differs",
     )
     require(
-        digest(loaded["model.json" if qemu else "model.repl"]) == plan["model_sha256"],
+        digest(loaded["model.json" if flash or qemu else "model.repl"]) == plan["model_sha256"],
         "model binding differs",
     )
     require(
         plan.get("profile") == profile
         and plan.get("schema_version")
-        == ("embedded-sim-runner.qemu-plan.v1" if qemu else "embedded-sim-runner.plan.v1"),
+        == (
+            "embedded-sim-runner.qemu-flash-plan.v1"
+            if flash
+            else "embedded-sim-runner.qemu-plan.v1"
+            if qemu
+            else "embedded-sim-runner.plan.v1"
+        ),
         "simulation plan profile differs",
     )
     for key, value in BOUNDARIES.items():
@@ -114,6 +176,29 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             type(plan.get(key)) is type(value) and plan[key] == value,
             "invalid plan simulation boundary",
         )
+    if flash:
+        require(
+            digest(loaded["esp32c3-rom.bin"]) == plan.get("rom_sha256")
+            and digest(loaded["efuse-initial.bin"]) == plan.get("efuse_initial_sha256")
+            and all(
+                len(loaded[name]) == 4 * 1024 * 1024
+                for name in ("flash-input.bin", "flash-work.bin")
+            )
+            and all(len(loaded[name]) == 1024 for name in ("efuse-initial.bin", "efuse-work.bin")),
+            "Flash/ROM/eFuse binding or size differs",
+        )
+        limits = model_limits(report)
+        stderr_lines = (
+            loaded.get("backend.stderr.bin", b"").decode("utf-8", errors="replace").splitlines()
+        )
+        require(
+            all(
+                stderr_lines.count(row["message"]) == row["count"]
+                for row in limits["model_diagnostics"]
+            ),
+            "saved diagnostic count differs",
+        )
+        source.update(limits)
     first = {
         "index": 1,
         "timestamp": report.get("host_started_utc"),
@@ -149,7 +234,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     source.update(
         execution_kind="simulation",
         physical_board_verified=False,
-        capture_outcome="succeeded" if report["ok"] else "failed",
+        capture_outcome=OUTCOMES[report["status"]],
         time_semantics="simulation_run_host_window_not_uart_event_time",
         host_window=window,
         evidence_inputs=refs,

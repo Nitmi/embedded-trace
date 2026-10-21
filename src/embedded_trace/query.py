@@ -8,9 +8,11 @@ from .common import (
     ID,
     MAX_DOCUMENT_BYTES,
     MAX_EVENTS,
+    MAX_FLASH_SOURCE_BYTES,
     MAX_LINE_BYTES,
     MAX_RECORD_BYTES,
     MAX_RECORDS,
+    MAX_SIM_TOTAL_BYTES,
     MAX_SOURCE_BYTES,
     MAX_TOTAL_BYTES,
     SHA,
@@ -21,6 +23,7 @@ from .common import (
     require,
     text,
 )
+from .simulation import FLASH_PROFILE, OUTCOMES, model_limits
 from .timeline import ORDERING, SAFETY
 
 
@@ -66,16 +69,18 @@ def validate(document: dict) -> None:
             integer(source.get("source_index"), "source index") == index, "invalid source ordering"
         )
         simulation = source.get("format") == "sim-runner-report"
-        extra_bytes = integer(
-            source.get("extra_input_bytes", 0), "extra evidence bytes", 0, MAX_SOURCE_BYTES
-        )
+        flash = simulation and source.get("profile") == FLASH_PROFILE
+        budget = MAX_FLASH_SOURCE_BYTES if flash else MAX_SOURCE_BYTES
+        extra_bytes = integer(source.get("extra_input_bytes", 0), "extra evidence bytes", 0, budget)
         require(simulation or extra_bytes == 0, "unexpected extra bytes on a device capture")
         require(
             source.get("format") in ("baud-jsonl", "rtt-jsonl", "sim-runner-report"),
             "invalid source format",
         )
         require(
-            source.get("capture_outcome") in ("succeeded", "failed", "partial"),
+            source.get("capture_outcome")
+            in ("succeeded", "succeeded_with_model_limits", "failed", "partial")
+            and (flash or source.get("capture_outcome") != "succeeded_with_model_limits"),
             "invalid capture outcome",
         )
         require(
@@ -118,26 +123,29 @@ def validate(document: dict) -> None:
                 "invalid simulation time semantics",
             )
             require(
-                source.get("recorded_status")
-                == ("passed" if source["capture_outcome"] == "succeeded" else "failed"),
+                source.get("recorded_status") in OUTCOMES
+                and OUTCOMES[source["recorded_status"]] == source["capture_outcome"],
                 "simulation verdict changed",
             )
+            if source["capture_outcome"] != "succeeded":
+                require(
+                    source["warnings"].get("capture_" + source["capture_outcome"]) == 1,
+                    "simulation outcome warning missing",
+                )
             refs = source.get("evidence_inputs")
             require(
-                isinstance(refs, dict) and 4 <= len(refs) <= 9,
+                isinstance(refs, dict) and 4 <= len(refs) <= (11 if flash else 9),
                 "invalid simulation evidence references",
             )
             for ref in refs.values():
                 reference(ref, MAX_SOURCE_BYTES)
             require(
-                integer(
-                    source.get("extra_input_bytes"), "extra evidence bytes", 0, MAX_SOURCE_BYTES
-                )
+                integer(source.get("extra_input_bytes"), "extra evidence bytes", 0, budget)
                 == sum(ref["size_bytes"] for ref in refs.values()),
                 "evidence byte budget differs",
             )
             require(
-                source["input"]["size_bytes"] + source["extra_input_bytes"] <= MAX_SOURCE_BYTES,
+                source["input"]["size_bytes"] + source["extra_input_bytes"] <= budget,
                 "simulation evidence exceeds byte budget",
             )
             saved = source.get("saved_records")
@@ -190,6 +198,12 @@ def validate(document: dict) -> None:
         and sum(
             source["input"]["size_bytes"] + source.get("extra_input_bytes", 0) for source in sources
         )
+        <= (
+            MAX_SIM_TOTAL_BYTES
+            if any(s["format"] == "sim-runner-report" for s in sources)
+            else MAX_TOTAL_BYTES
+        )
+        and sum(s["input"]["size_bytes"] for s in sources if s["format"] != "sim-runner-report")
         <= MAX_TOTAL_BYTES,
         "source totals exceed limits",
     )
@@ -392,8 +406,27 @@ def validate(document: dict) -> None:
             require(
                 report.get("execution_kind") == "simulation"
                 and report.get("hardware_access") is False
-                and report.get("physical_board_verified") is False,
+                and report.get("physical_board_verified") is False
+                and report.get("physical_firmware_identity_verified") is False
+                and report.get("ok") is (source["recorded_status"] != "failed")
+                and report.get("profile") == source["profile"],
                 "simulation metadata relabeled",
+            )
+            if source["profile"] == FLASH_PROFILE:
+                require(
+                    report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
+                    and all(source.get(k) == v for k, v in model_limits(report).items()),
+                    "simulation model limitations changed",
+                )
+            require(
+                isinstance(report.get("artifacts"), dict)
+                and set(report["artifacts"]) == set(source["evidence_inputs"])
+                and all(
+                    report["artifacts"][name].get("sha256") == ref["sha256"]
+                    and report["artifacts"][name].get("bytes") == ref["size_bytes"]
+                    for name, ref in source["evidence_inputs"].items()
+                ),
+                "simulation artifact references changed",
             )
             raw_uart = b"".join(
                 decode_base64(e["payload"]["raw_base64"]) for e in local if e["kind"] == "line"

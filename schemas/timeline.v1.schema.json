@@ -41,7 +41,7 @@
           "input_hash_verified": {"const": true}, "record_structure_verified": {"const": true},
           "finish_payload_hash_verified": {"type": ["boolean", "null"]}
         }},
-        "capture_outcome": {"enum": ["succeeded", "failed", "partial"]},
+        "capture_outcome": {"enum": ["succeeded", "succeeded_with_model_limits", "failed", "partial"]},
         "time_semantics": {"type": "string"}
       }}
     },

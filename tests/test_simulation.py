@@ -14,7 +14,14 @@ from embedded_trace.simulation import BOUNDARIES
 from embedded_trace.timeline import correlate
 
 
-def evidence(root, *, qemu=True, passed=True, uart=b"READY\r\nBUILD abc\r\nHEARTBEAT 00000001\r\n"):
+def evidence(
+    root,
+    *,
+    qemu=True,
+    passed=True,
+    flash=False,
+    uart=b"READY\r\nBUILD abc\r\nHEARTBEAT 00000001\r\n",
+):
     root.mkdir()
     files = {
         "runtime-lock.json": b"{}\n",
@@ -27,6 +34,18 @@ def evidence(root, *, qemu=True, passed=True, uart=b"READY\r\nBUILD abc\r\nHEART
         files.update({"run.resc": b"synthetic script", "renode.config": b""})
     if uart is not None:
         files["uart.bin"] = uart
+    if flash:
+        del files["firmware.elf"]
+        files.update(
+            {
+                "flash-input.bin": b"\xff" * (4 * 1024 * 1024),
+                "flash-work.bin": b"\xff" * (4 * 1024 * 1024),
+                "esp32c3-rom.bin": b"synthetic ROM",
+                "efuse-initial.bin": bytes(1024),
+                "efuse-work.bin": bytes(1024),
+                "backend.stderr.bin": b"synthetic model limit\n" * 2,
+            }
+        )
     profile = "esp32c3-ram-uart-v1" if qemu else "nrf52840-uart-v1"
     plan = {
         **BOUNDARIES,
@@ -35,9 +54,21 @@ def evidence(root, *, qemu=True, passed=True, uart=b"READY\r\nBUILD abc\r\nHEART
         else "embedded-sim-runner.plan.v1",
         "profile": profile,
         "runtime_lock": {"sha256": digest(files["runtime-lock.json"])},
-        "firmware": {"sha256": digest(files["firmware.elf" if qemu else "firmware.bin"])},
+        "firmware": {
+            "sha256": digest(
+                files["flash-input.bin" if flash else "firmware.elf" if qemu else "firmware.bin"]
+            )
+        },
         "model_sha256": digest(files["model.json" if qemu else "model.repl"]),
     }
+    if flash:
+        profile = "esp32c3-idf-flash-v1"
+        plan.update(
+            schema_version="embedded-sim-runner.qemu-flash-plan.v1",
+            profile=profile,
+            rom_sha256=digest(files["esp32c3-rom.bin"]),
+            efuse_initial_sha256=digest(files["efuse-initial.bin"]),
+        )
     files["plan.json"] = json.dumps(plan).encode()
     artifacts = {}
     for name, data in files.items():
@@ -70,9 +101,85 @@ def evidence(root, *, qemu=True, passed=True, uart=b"READY\r\nBUILD abc\r\nHEART
         },
         "errors": [] if passed else [{"code": "MODEL_COVERAGE_FAILED"}],
     }
+    if flash:
+        report.update(
+            schema_version="embedded-sim-runner.qemu-flash-report.v1",
+            status="passed_with_model_limits" if passed else "failed",
+            assertions={
+                "model_diagnostics": [
+                    {"message": "synthetic model limit", "count": 2, "meaning": "synthetic"}
+                ]
+            }
+            if passed
+            else None,
+            model_coverage_complete=False,
+            security_features_verified=False,
+        )
     path = root / "report.json"
     path.write_text(json.dumps(report))
     return path
+
+
+@pytest.mark.parametrize("passed", [True, False])
+def test_flash_storage_exceeds_old_budget_and_keeps_limited_or_failed_verdict(
+    tmp_path, monkeypatch, passed
+):
+    monkeypatch.setattr(
+        "subprocess.Popen", lambda *a, **kw: pytest.fail("offline Flash import spawned")
+    )
+    path = evidence(tmp_path / "native", flash=True, passed=passed)
+    doc = correlate(spec(path))
+    validate(doc)
+    source = doc["sources"][0]
+    assert source["extra_input_bytes"] > 8 * 1024 * 1024
+    assert source["capture_outcome"] == ("succeeded_with_model_limits" if passed else "failed")
+    assert doc["status"] == "correlated_with_warnings"
+    assert source["model_coverage_complete"] is source["security_features_verified"] is False
+    assert source["model_diagnostics"] == (
+        []
+        if not passed
+        else [{"message": "synthetic model limit", "count": 2, "meaning": "synthetic"}]
+    )
+    if passed:
+        from embedded_trace.report import report as render
+
+        timeline = tmp_path / "timeline.json"
+        timeline.write_text(json.dumps(doc))
+        markdown = tmp_path / "report.md"
+        result = render(timeline, digest(timeline.read_bytes()), markdown)
+        assert result["capture_outcomes"] == {"sim": "succeeded_with_model_limits"}
+        text = markdown.read_text()
+        assert "synthetic model limit" in text and "passed_with_model_limits" in text
+        assert '"model_coverage_complete": false' in text
+
+
+@pytest.mark.parametrize("mutation", ["status", "diagnostics", "coverage", "security", "warning"])
+def test_flash_timeline_cannot_flatten_native_model_limitations(tmp_path, mutation):
+    doc = correlate(spec(evidence(tmp_path / "native", flash=True)))
+    source = doc["sources"][0]
+    if mutation == "status":
+        source.update(capture_outcome="succeeded", recorded_status="passed", warnings={})
+        doc["status"] = "correlated"
+    if mutation == "diagnostics":
+        source["model_diagnostics"] = []
+    if mutation == "coverage":
+        source["model_coverage_complete"] = True
+    if mutation == "security":
+        source["security_features_verified"] = True
+    if mutation == "warning":
+        source["warnings"] = {}
+        doc["status"] = "correlated"
+    with pytest.raises(TraceError):
+        validate(doc)
+
+
+def test_flash_saved_diagnostic_counts_are_bound_to_raw_stderr(tmp_path):
+    path = evidence(tmp_path / "native", flash=True)
+    doc = json.loads(path.read_bytes())
+    doc["assertions"]["model_diagnostics"][0]["count"] = 3
+    path.write_text(json.dumps(doc))
+    with pytest.raises(TraceError, match="diagnostic count differs"):
+        correlate(spec(path))
 
 
 def spec(path):
