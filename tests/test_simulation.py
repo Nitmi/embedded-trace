@@ -141,6 +141,7 @@ def test_flash_storage_exceeds_old_budget_and_keeps_limited_or_failed_verdict(
         else [{"message": "synthetic model limit", "count": 2, "meaning": "synthetic"}]
     )
     if passed:
+        from embedded_trace.query import inspect, query
         from embedded_trace.report import report as render
 
         timeline = tmp_path / "timeline.json"
@@ -151,6 +152,15 @@ def test_flash_storage_exceeds_old_budget_and_keeps_limited_or_failed_verdict(
         text = markdown.read_text()
         assert "synthetic model limit" in text and "passed_with_model_limits" in text
         assert '"model_coverage_complete": false' in text
+        for value in (
+            query(timeline, digest(timeline.read_bytes()), contains="HEARTBEAT"),
+            inspect(timeline, digest(timeline.read_bytes())),
+        ):
+            assert value["capture_outcomes"] == {"sim": "succeeded_with_model_limits"}
+            assert (
+                value["simulation_sources"]["sim"]["model_diagnostics"]
+                == source["model_diagnostics"]
+            )
 
 
 @pytest.mark.parametrize("mutation", ["status", "diagnostics", "coverage", "security", "warning"])

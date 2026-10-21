@@ -475,8 +475,28 @@ def inspect(path: Path, sha256: str) -> dict:
         "capture_outcomes": {
             source["id"]: source["capture_outcome"] for source in document["sources"]
         },
+        "simulation_sources": simulation_sources(document),
         "source_files_rechecked": False,
         "timeline_hash_and_layout_verified": True,
+    }
+
+
+def simulation_sources(document: dict) -> dict:
+    """Keep native qualifications visible even when a query excludes metadata events."""
+    keys = (
+        "execution_kind",
+        "physical_board_verified",
+        "profile",
+        "recorded_status",
+        "native_assertions_reexecuted",
+        "model_diagnostics",
+        "model_coverage_complete",
+        "security_features_verified",
+    )
+    return {
+        source["id"]: {key: source[key] for key in keys if key in source}
+        for source in document["sources"]
+        if source["format"] == "sim-runner-report"
     }
 
 
@@ -552,6 +572,11 @@ def select_events(
     ]
     return {
         "timeline": ref,
+        "status": document["status"],
+        "capture_outcomes": {
+            source["id"]: source["capture_outcome"] for source in document["sources"]
+        },
+        "simulation_sources": simulation_sources(document),
         "matches_total": len(matches),
         "offset": offset,
         "limit": limit,
