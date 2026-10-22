@@ -23,6 +23,34 @@ from .common import (
 from .framing import Framer
 
 FORMAT = "sim-runner-report"
+WASM_PROFILE = "esp32c3-wasm-flash-v1"
+WASM_COMPONENTS = {
+    "component/" + n for n in ("esp_emu.js", "esp_emu_bg.wasm", "package.json", "LICENSE")
+}
+WASM_LIMITS = [
+    "experimental_binary_only_core_not_independently_source_verified",
+    "uart_api_returns_strings_original_uart_byte_fidelity_not_established",
+    "embedded_rom_and_efuse_defaults_not_independently_dumped",
+    "cycle_counter_and_cycles_per_us_are_model_claims_not_measured_timing",
+    "no_radio_network_electrical_or_complete_chip_coverage",
+]
+WASM_FIELDS = (
+    "backend",
+    "backend_version",
+    "runtime_archive_sha256",
+    "virtual_time",
+    "uart_timestamps_available",
+    "uart_representation",
+    "raw_uart_bytes_verified",
+    "model_coverage_complete",
+    "physical_timing_verified",
+    "security_features_verified",
+    "initial_state",
+    "model_limits",
+    "runtime_observation",
+    "native_errors",
+    "native_assertions",
+)
 FLASH_PROFILE = "esp32c3-idf-flash-v1"
 S3_PROFILE = "esp32s3-idf-flash-v1"
 FLASH_PROFILES = (FLASH_PROFILE, S3_PROFILE)
@@ -60,6 +88,164 @@ BOUNDARIES = {
     "physical_board_verified": False,
     "physical_firmware_identity_verified": False,
 }
+
+
+def wasm_summary(report: dict) -> dict:
+    """Keep native declarations, including unknown outcomes; never rerun firmware policy."""
+    require(
+        report.get("schema_version") == "embedded-sim-runner.esp-wasm-report.v1"
+        and report.get("backend") == "espressif-esp-emulator-wasm"
+        and report.get("backend_version") == "0.50.0"
+        and report.get("status") in ("failed", "passed_with_model_limits")
+        and report.get("model_limits") == WASM_LIMITS
+        and report.get("initial_state")
+        == "fresh_instance_private_flash_builtin_rom_and_opaque_default_efuse"
+        and report.get("uart_representation") == "ascii_subset_of_wasm_strings_encoded_utf8"
+        and all(
+            report.get(k) is False
+            for k in (
+                "uart_timestamps_available",
+                "raw_uart_bytes_verified",
+                "model_coverage_complete",
+                "physical_timing_verified",
+                "security_features_verified",
+            )
+        ),
+        "invalid WASM identity/qualification/representation",
+    )
+    clock = report.get("virtual_time")
+    require(
+        isinstance(clock, dict)
+        and set(clock) == {"domain", "elapsed_ns", "budget_enforced"}
+        and clock["domain"] == "esp_emulator_unmeasured_device_clock"
+        and clock["elapsed_ns"] is None
+        and clock["budget_enforced"] is False,
+        "invalid WASM unmeasured clock",
+    )
+    require(
+        re.fullmatch(
+            r"[0-9a-f]{64}", text(report.get("runtime_archive_sha256"), "WASM archive hash", 64)
+        )
+        is not None,
+        "invalid WASM archive hash",
+    )
+    seen = report.get("runtime_observation")
+    require(seen is None or isinstance(seen, dict), "invalid WASM observation")
+    if seen is not None:
+        require(
+            set(seen)
+            == {
+                "schema_version",
+                "node_version",
+                "chip",
+                "harts",
+                "xtensa",
+                "batches",
+                "requested_instruction_upper_bound",
+                "cycle_counter",
+                "cycles_per_us_claim",
+                "stop_reason",
+                "uart_utf8_bytes",
+                "uart_representation",
+                "restart_performed",
+                "physical_bridges",
+            },
+            "invalid WASM host fields",
+        )
+        require(
+            seen["schema_version"] == "embedded-sim-runner.esp-wasm-host.v1"
+            and seen["node_version"] == "24.15.0"
+            and seen["chip"] == "esp32c3"
+            and type(seen["harts"]) is int
+            and seen["harts"] == 1
+            and seen["xtensa"] is False
+            and seen["restart_performed"] is False
+            and seen["physical_bridges"] == []
+            and seen["stop_reason"] in ("guest_restart_requested", "instruction_budget")
+            and seen["uart_representation"] == report["uart_representation"],
+            "invalid WASM host identity/stop/bridge declaration",
+        )
+        batches = integer(seen["batches"], "WASM batches", 1, 10000)
+        require(
+            integer(seen["requested_instruction_upper_bound"], "requested instruction bound")
+            == batches * 10000,
+            "invalid WASM instruction upper bound",
+        )
+        require(
+            re.fullmatch(r"[0-9]{1,20}", text(seen["cycle_counter"], "model counter", 20))
+            is not None,
+            "invalid WASM model counter",
+        )
+        require(
+            type(seen["cycles_per_us_claim"]) is int and seen["cycles_per_us_claim"] == 160,
+            "invalid WASM model clock claim",
+        )
+        integer(seen["uart_utf8_bytes"], "encoded UART bytes", 0, MAX_SOURCE_BYTES)
+    assertions, errors = report.get("assertions"), report.get("errors")
+    require(assertions is None or isinstance(assertions, dict), "invalid WASM assertions")
+    require(isinstance(errors, list) and len(errors) <= 16, "invalid WASM errors")
+    for error in errors:
+        require(isinstance(error, dict) and set(error) == {"code", "message"}, "invalid WASM error")
+        text(error["code"], "error code", 128)
+        text(error["message"], "error message", 2048)
+    require(
+        not report["ok"] or (seen is not None and assertions is not None),
+        "passing WASM lacks native declarations",
+    )
+    return {
+        k: copy.deepcopy(report[k])
+        for k in WASM_FIELDS
+        if k not in ("native_errors", "native_assertions")
+    } | {"native_errors": copy.deepcopy(errors), "native_assertions": copy.deepcopy(assertions)}
+
+
+def wasm_binding(report, plan, loaded, source):
+    summary = wasm_summary(report)
+    runtime, model = (parse_json(loaded[n]) for n in ("runtime-lock.json", "model.json"))
+    require(
+        plan.get("backend") == runtime.get("backend") == model.get("backend") == summary["backend"]
+        and plan.get("backend_version")
+        == runtime.get("version")
+        == model.get("version")
+        == summary["backend_version"]
+        and runtime.get("schema_version") == "embedded-sim-runner.esp-wasm-runtime.v1"
+        and runtime.get("archive_sha256")
+        == model.get("archive_sha256")
+        == summary["runtime_archive_sha256"]
+        and runtime.get("files") == model.get("files")
+        and runtime.get("node", {}).get("version") == model.get("node_version") == "24.15.0"
+        and plan.get("initial_state") == summary["initial_state"]
+        and plan.get("physical_bridges") == []
+        and plan.get("retries") == 0
+        and digest(loaded["runner.mjs"]) == plan.get("host_script_sha256")
+        and len(loaded["flash-input.bin"]) == 4 * 1024 * 1024,
+        "WASM runtime/model/initial-state binding differs",
+    )
+    files = runtime.get("files")
+    require(isinstance(files, dict), "invalid WASM runtime files")
+    for name in WASM_COMPONENTS:
+        require(
+            digest(loaded[name]) == files.get("www/pkg/" + name.split("/")[1]),
+            "WASM saved component binding differs",
+        )
+    budget = integer(plan.get("instruction_budget"), "instruction budget", 10000, 100000000)
+    require(budget % 10000 == 0, "invalid WASM instruction budget")
+    seen = summary["runtime_observation"]
+    if seen is not None:
+        uart = loaded.get("uart.bin", b"")
+        require(
+            uart.isascii()
+            and len(uart) == seen["uart_utf8_bytes"]
+            and seen["requested_instruction_upper_bound"] <= budget
+            and (
+                seen["stop_reason"] != "instruction_budget"
+                or seen["requested_instruction_upper_bound"] == budget
+            )
+            and parse_json(loaded.get("backend.stdout.bin", b"")) == seen,
+            "WASM saved host summary/encoded UART differs",
+        )
+    source.update(summary)
+    source["warnings"].update(model_coverage_incomplete=1, uart_byte_fidelity_unverified=1)
 
 
 def model_limits(report: dict) -> dict:
@@ -338,13 +524,18 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    wasm = report.get("schema_version") == "embedded-sim-runner.esp-wasm-report.v1"
     fault = report.get("schema_version") == "embedded-sim-runner.gpio-fault-report.v1"
     gpio = fault or report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
     s3 = report.get("schema_version") == "embedded-sim-runner.qemu-s3-flash-report.v1"
     flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        gpio or flash or qemu or report.get("schema_version") == "embedded-sim-runner.report.v1",
+        wasm
+        or gpio
+        or flash
+        or qemu
+        or report.get("schema_version") == "embedded-sim-runner.report.v1",
         "unsupported simulation report",
     )
     for key, value in BOUNDARIES.items():
@@ -353,7 +544,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        FAULT_PROFILE
+        WASM_PROFILE
+        if wasm
+        else FAULT_PROFILE
         if fault
         else GPIO_PROFILE
         if gpio
@@ -369,11 +562,14 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     require(
         report.get("status") in OUTCOMES
         and report.get("ok") is (report["status"] != "failed")
-        and (flash or report["status"] != "passed_with_model_limits"),
+        and (flash or wasm or report["status"] != "passed_with_model_limits"),
         "simulation verdict mismatch",
     )
     required = (
-        {
+        {"plan.json", "runtime-lock.json", "model.json", "runner.mjs", "flash-input.bin"}
+        | WASM_COMPONENTS
+        if wasm
+        else {
             "plan.json",
             "runtime-lock.json",
             "model.json",
@@ -406,7 +602,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     loaded = {}
     refs = {}
     total = 0
-    budget = MAX_FLASH_SOURCE_BYTES if flash else MAX_SOURCE_BYTES
+    budget = MAX_FLASH_SOURCE_BYTES if flash or wasm else MAX_SOURCE_BYTES
     for name, record in artifacts.items():
         require(isinstance(record, dict), "invalid artifact record")
         # Never follow recorded absolute paths; only the adjacent fixed filenames.
@@ -433,19 +629,26 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         "runtime binding differs",
     )
     require(
-        digest(loaded["flash-input.bin" if flash else "firmware.elf" if qemu else "firmware.bin"])
+        digest(
+            loaded[
+                "flash-input.bin" if flash or wasm else "firmware.elf" if qemu else "firmware.bin"
+            ]
+        )
         == plan["firmware"]["sha256"],
         "firmware binding differs",
     )
     require(
-        digest(loaded["model.json" if flash or qemu else "model.repl"]) == plan["model_sha256"],
+        digest(loaded["model.json" if flash or wasm or qemu else "model.repl"])
+        == plan["model_sha256"],
         "model binding differs",
     )
     require(
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.gpio-fault-plan.v1"
+            "embedded-sim-runner.esp-wasm-plan.v1"
+            if wasm
+            else "embedded-sim-runner.gpio-fault-plan.v1"
             if fault
             else "embedded-sim-runner.gpio-timer-plan.v1"
             if gpio
@@ -464,6 +667,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             type(plan.get(key)) is type(value) and plan[key] == value,
             "invalid plan simulation boundary",
         )
+    if wasm:
+        wasm_binding(report, plan, loaded, source)
     if gpio:
         summary = gpio_summary(report)
         require(

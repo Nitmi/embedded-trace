@@ -33,10 +33,13 @@ from .simulation import (
     OUTCOMES,
     S3_FIELDS,
     S3_PROFILE,
+    WASM_FIELDS,
+    WASM_PROFILE,
     gpio_summary,
     model_limits,
     s3_summary,
     validate_gpio_spans,
+    wasm_summary,
 )
 from .timeline import ORDERING, SAFETY
 
@@ -83,8 +86,9 @@ def validate(document: dict) -> None:
             integer(source.get("source_index"), "source index") == index, "invalid source ordering"
         )
         simulation = source.get("format") == "sim-runner-report"
+        wasm = simulation and source.get("profile") == WASM_PROFILE
         flash = simulation and source.get("profile") in FLASH_PROFILES
-        budget = MAX_FLASH_SOURCE_BYTES if flash else MAX_SOURCE_BYTES
+        budget = MAX_FLASH_SOURCE_BYTES if flash or wasm else MAX_SOURCE_BYTES
         extra_bytes = integer(source.get("extra_input_bytes", 0), "extra evidence bytes", 0, budget)
         require(simulation or extra_bytes == 0, "unexpected extra bytes on a device capture")
         require(
@@ -94,7 +98,7 @@ def validate(document: dict) -> None:
         require(
             source.get("capture_outcome")
             in ("succeeded", "succeeded_with_model_limits", "failed", "partial")
-            and (flash or source.get("capture_outcome") != "succeeded_with_model_limits"),
+            and (flash or wasm or source.get("capture_outcome") != "succeeded_with_model_limits"),
             "invalid capture outcome",
         )
         require(
@@ -148,7 +152,7 @@ def validate(document: dict) -> None:
                 )
             refs = source.get("evidence_inputs")
             require(
-                isinstance(refs, dict) and 4 <= len(refs) <= (11 if flash else 9),
+                isinstance(refs, dict) and 4 <= len(refs) <= (12 if wasm else 11 if flash else 9),
                 "invalid simulation evidence references",
             )
             for ref in refs.values():
@@ -445,6 +449,15 @@ def validate(document: dict) -> None:
                     == json.dumps(expected, sort_keys=True),
                     "S3 identity/clock/core declarations changed",
                 )
+            if source["profile"] == WASM_PROFILE:
+                expected = wasm_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["warnings"].get("model_coverage_incomplete") == 1
+                    and source["warnings"].get("uart_byte_fidelity_unverified") == 1,
+                    "WASM representation/qualification/declarations changed",
+                )
             if source["profile"] in (GPIO_PROFILE, FAULT_PROFILE):
                 expected = gpio_summary(report)
                 require(
@@ -542,6 +555,7 @@ def simulation_sources(document: dict) -> dict:
         *GPIO_FIELDS,
         *FAULT_FIELDS,
         *S3_FIELDS,
+        *WASM_FIELDS,
     )
     return {
         source["id"]: {key: source[key] for key in keys if key in source}

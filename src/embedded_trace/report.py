@@ -16,6 +16,8 @@ from .simulation import (
     GPIO_PROFILE,
     S3_FIELDS,
     S3_PROFILE,
+    WASM_FIELDS,
+    WASM_PROFILE,
 )
 from .timeline import SAFETY
 
@@ -140,6 +142,11 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                 **(
                     {key: source[key] for key in S3_FIELDS}
                     if source.get("profile") == S3_PROFILE
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in WASM_FIELDS}
+                    if source.get("profile") == WASM_PROFILE
                     else {}
                 ),
                 "event_kinds": {

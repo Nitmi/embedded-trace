@@ -1,5 +1,25 @@
 # Offline simulation evidence
 
+## Experimental ESP-EMU WASM in local 0.8.0
+
+The unpublished candidate accepts `embedded-sim-runner.esp-wasm-report.v1`
+for `esp32c3-wasm-flash-v1`. Only the fixed adjacent artifacts and four fixed
+`component/` files are read. Source evidence stays bounded to 12 MiB (96 MiB
+for a simulation selection); recorded absolute paths are never followed.
+
+`uart.bin` spans refer to UTF-8 encoded ASCII strings returned by WASM, not
+verified original UART bytes. `raw_uart_bytes_verified=false`, `model_limits`,
+opaque ROM/eFuse `initial_state`, unmeasured `virtual_time`, native assertions,
+native errors and runtime observations stay in inspect/query/Markdown summaries
+even when filters exclude metadata. Budget exhaustion remains failed; timeout
+observations/assertions remain null. Requested instruction upper bounds and
+model cycle counters or cycles-per-us claims are not measured physical timing.
+A guest restart request is a stop reason; `restart_performed=false` is retained.
+
+Successful imports never promote `passed_with_model_limits` or failed captures.
+Trace validates saved layout, hashes and declarations without loading simulator
+code, launching Node, accessing live paths or rerunning firmware assertion policy.
+
 ## Fault reports in 0.7.0
 
 The `nrf52840-gpio-timer-fault-v1` adapter preserves `fault_scenario`,
@@ -44,12 +64,12 @@ failed native reports. No Toolkit/station update or component execution occurs.
 Only fixed `nrf52840-uart-v1`, `esp32c3-ram-uart-v1` and
 `esp32c3-idf-flash-v1`, `nrf52840-gpio-timer-v1`, `nrf52840-gpio-timer-fault-v1`
 and `esp32s3-idf-flash-v1` reports are supported.
-Only the declared fixed basenames next to the report are opened; recorded absolute
+Only the declared fixed basenames (and four fixed WASM `component/` files) next to the report are opened; recorded absolute
 paths are untrusted metadata. Hashes, sizes, plan/lock/firmware/model bindings,
 simulation flags and declared successful process cleanup are checked. Missing,
 changed, traversing or linked evidence fails before timeline output is created.
 Source limits include all adjacent evidence bytes: 8 MiB for old profiles/device
-captures; 12 MiB for Flash (including two 4 MiB images, ROM and eFuse copies).
+captures; 12 MiB for Flash/WASM (including staged model inputs and runtime files).
 Physical captures still total at most 16 MiB, including in mixed inputs. Inputs
 with explicitly selected simulation reports have a 96 MiB total budget for up
 to eight sources. Native reports remain bounded to 128 KiB, timeline JSON to
