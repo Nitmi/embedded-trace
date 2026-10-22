@@ -8,7 +8,15 @@ from pathlib import Path
 from . import __version__
 from .common import require, write_new_bytes
 from .query import load, select_events
-from .simulation import FLASH_PROFILES, GPIO_FIELDS, GPIO_PROFILE, S3_FIELDS, S3_PROFILE
+from .simulation import (
+    FAULT_FIELDS,
+    FAULT_PROFILE,
+    FLASH_PROFILES,
+    GPIO_FIELDS,
+    GPIO_PROFILE,
+    S3_FIELDS,
+    S3_PROFILE,
+)
 from .timeline import SAFETY
 
 MAX_REPORT_BYTES = 1024 * 1024
@@ -121,7 +129,12 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                 ),
                 **(
                     {key: source[key] for key in GPIO_FIELDS}
-                    if source.get("profile") == GPIO_PROFILE
+                    if source.get("profile") in (GPIO_PROFILE, FAULT_PROFILE)
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in FAULT_FIELDS}
+                    if source.get("profile") == FAULT_PROFILE
                     else {}
                 ),
                 **(

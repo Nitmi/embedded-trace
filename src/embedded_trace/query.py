@@ -25,6 +25,8 @@ from .common import (
     text,
 )
 from .simulation import (
+    FAULT_FIELDS,
+    FAULT_PROFILE,
     FLASH_PROFILES,
     GPIO_FIELDS,
     GPIO_PROFILE,
@@ -443,10 +445,15 @@ def validate(document: dict) -> None:
                     == json.dumps(expected, sort_keys=True),
                     "S3 identity/clock/core declarations changed",
                 )
-            if source["profile"] == GPIO_PROFILE:
+            if source["profile"] in (GPIO_PROFILE, FAULT_PROFILE):
                 expected = gpio_summary(report)
                 require(
-                    report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
+                    report.get("schema_version")
+                    == (
+                        "embedded-sim-runner.gpio-fault-report.v1"
+                        if source["profile"] == FAULT_PROFILE
+                        else "embedded-sim-runner.gpio-timer-report.v1"
+                    )
                     and json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
                     == json.dumps(expected, sort_keys=True)
                     and json.dumps(source.get("virtual_time"), sort_keys=True)
@@ -533,6 +540,7 @@ def simulation_sources(document: dict) -> dict:
         "model_coverage_complete",
         "security_features_verified",
         *GPIO_FIELDS,
+        *FAULT_FIELDS,
         *S3_FIELDS,
     )
     return {

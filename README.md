@@ -1,5 +1,10 @@
 # Embedded Trace
 
+The local 0.7.0 candidate adds sim-runner 0.6.0 GPIO/TIMER0 fault reports.
+Native fault analysis, failures and unknown effects stay visible in filtered
+queries and Markdown, with raw counter/IRQ snapshot spans. This candidate is not
+a published release; successful import never changes the native verdict.
+
 The published [0.6.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.6.0)
 adds Xtensa ESP32-S3 Flash identity, unmeasured clock and
 core declarations alongside Renode GPIO/TIMER0 reports with separate guest samples,

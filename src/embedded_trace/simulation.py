@@ -34,6 +34,10 @@ S3_FIELDS = (
     "app_core_markers",
 )
 GPIO_PROFILE = "nrf52840-gpio-timer-v1"
+FAULT_PROFILE = "nrf52840-gpio-timer-fault-v1"
+FAULTS = ("none", "gpio-stuck-low", "gpio-stuck-high", "timer-stop", "timer-irq-mask")
+FAULT_SCOPE = "fixed_paused_model_input_not_physical_fault_or_root_cause_proof"
+FAULT_FIELDS = ("fault_scenario", "fault_scope", "fault_request", "fault_evidence", "native_errors")
 GPIO_LABELS = {
     "gpio_observation_semantics": "paused_model_register_snapshot_not_electrical_waveform",
     "timer_observation_semantics": "guest_reported_250kHz_capture_in_TIMER0_IRQ_not_host_time",
@@ -99,6 +103,7 @@ def gpio_summary(report: dict) -> dict:
         and all(report.get(k) == v for k, v in GPIO_LABELS.items()),
         "invalid GPIO coverage or observation semantics",
     )
+    fault = report.get("profile") == FAULT_PROFILE
     assertions = report.get("assertions")
     require(assertions is None or isinstance(assertions, dict), "invalid GPIO assertions")
     require(not report["ok"] or isinstance(assertions, dict), "passing GPIO lacks assertions")
@@ -113,10 +118,13 @@ def gpio_summary(report: dict) -> dict:
             (
                 "model_observations",
                 16,
-                ("phase", "requested_virtual_ms", "out_register", "in_register"),
+                ("phase", "requested_virtual_ms", "out_register", "in_register")
+                + (("timer_counter", "interrupt_enable") if fault else ()),
             ),
         ):
             rows = assertions.get(key)
+            if fault:
+                maximum = 16 if key == "samples" else 4
             require(isinstance(rows, list) and len(rows) <= maximum, "invalid GPIO evidence rows")
             for row in rows:
                 require(
@@ -131,11 +139,83 @@ def gpio_summary(report: dict) -> dict:
                         1 if field in ("input", "output", "loopback") else 2**32 - 1,
                     )
             evidence[key] = [dict(row) for row in rows]
-    return {
+        if fault:
+            require(
+                [row["phase"] for row in evidence["model_observations"]] in ([], [0, 1, 2, 3]),
+                "invalid fault model observation inventory/order",
+            )
+    result = {
         "model_coverage_complete": False,
         "physical_timing_verified": False,
         **GPIO_LABELS,
         "gpio_evidence": evidence,
+    }
+    if fault:
+        result.update(fault_summary(report))
+    return result
+
+
+def fault_summary(report: dict) -> dict:
+    """Preserve native analysis, including unknown effects, without rerunning policy."""
+    scenario = report.get("fault_scenario")
+    require(
+        scenario in FAULTS and report.get("fault_scope") == FAULT_SCOPE, "invalid fault identity"
+    )
+    assertions = report.get("assertions")
+    if assertions is not None:
+        require(
+            type(assertions.get("nominal_regression_passed")) is bool, "invalid nominal verdict"
+        )
+        failure = assertions.get("nominal_failure")
+        require(failure is None or isinstance(failure, str), "invalid nominal failure")
+        if failure is not None:
+            text(failure, "nominal failure", 2048)
+        effect = assertions.get("fault")
+        require(
+            isinstance(effect, dict)
+            and set(effect) == {"id", "effect_observed", "status"}
+            and effect["id"] == scenario
+            and (effect["effect_observed"] is None or type(effect["effect_observed"]) is bool)
+            and effect["status"] in ("not_evaluated", "not_requested", "observed", "not_observed"),
+            "invalid native fault effect",
+        )
+        for key in (
+            "ready_matches",
+            "build_matches",
+            "model_timer_nominal",
+            "sample_summary_truncated",
+        ):
+            if key in assertions:
+                require(type(assertions[key]) is bool, "invalid fault boolean declaration")
+        if "sample_lines_seen" in assertions:
+            integer(assertions["sample_lines_seen"], "sample lines", 0, MAX_SOURCE_BYTES)
+    errors = report.get("errors")
+    require(isinstance(errors, list) and len(errors) <= 16, "invalid native fault errors")
+    for error in errors:
+        require(
+            isinstance(error, dict) and set(error) == {"code", "message"}, "invalid fault error"
+        )
+        text(error["code"], "native error code", 128)
+        text(error["message"], "native error message", 2048)
+    clock = report.get("virtual_time")
+    require(
+        isinstance(clock, dict)
+        and set(clock) == {"domain", "requested_ms", "completed"}
+        and clock["domain"] == "renode_emulation"
+        and type(clock["requested_ms"]) is int
+        and clock["requested_ms"] == 82
+        and type(clock["completed"]) is bool,
+        "invalid fault virtual time declaration",
+    )
+    return {
+        "fault_scenario": scenario,
+        "fault_scope": FAULT_SCOPE,
+        "fault_request": {
+            "id": scenario,
+            "requested_virtual_ms": None if scenario == "none" else 22,
+        },
+        "fault_evidence": copy.deepcopy(assertions),
+        "native_errors": copy.deepcopy(errors),
     }
 
 
@@ -174,7 +254,13 @@ def s3_summary(report: dict) -> dict:
     }
 
 
-def gpio_pattern(phase: int):
+def gpio_pattern(phase: int, fault=False):
+    if fault:
+        return (
+            rb"(?m)^SIM_FAULT_OBS_"
+            + str(phase).encode("ascii")
+            + rb"\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n"
+        )
     return (
         rb"(?m)^SIM_GPIO_OBS_"
         + str(phase).encode("ascii")
@@ -184,12 +270,16 @@ def gpio_pattern(phase: int):
 
 def gpio_spans(summary: dict, stdout: bytes) -> list:
     spans = []
+    fault = "fault_scenario" in summary
+    fields = ("out_register", "in_register") + (
+        ("timer_counter", "interrupt_enable") if fault else ()
+    )
     for row in summary["gpio_evidence"]["model_observations"] or []:
-        matches = list(re.finditer(gpio_pattern(row["phase"]), stdout))
+        matches = list(re.finditer(gpio_pattern(row["phase"], fault), stdout))
         require(len(matches) == 1, "GPIO model observation missing/duplicate in stdout")
         match = matches[0]
         require(
-            [int(v) for v in match.groups()] == [row["out_register"], row["in_register"]],
+            [int(v) for v in match.groups()] == [row[k] for k in fields],
             "GPIO model observation differs from raw stdout",
         )
         raw = match[0]
@@ -212,6 +302,10 @@ def validate_gpio_spans(source: dict) -> None:
     require(isinstance(spans, list) and len(spans) == len(rows), "invalid GPIO observation spans")
     cursor = 0
     phases = set()
+    fault = source.get("profile") == FAULT_PROFILE
+    fields = ("out_register", "in_register") + (
+        ("timer_counter", "interrupt_enable") if fault else ()
+    )
     for span, row in zip(spans, rows, strict=True):
         require(
             isinstance(span, dict)
@@ -228,12 +322,12 @@ def validate_gpio_spans(source: dict) -> None:
         end = integer(span["byte_end"], "GPIO span end", start + 1, ref["size_bytes"])
         require(end - start <= 128, "GPIO observation span exceeds limit")
         raw = decode_base64(span["raw_base64"])
-        match = re.fullmatch(gpio_pattern(row["phase"]), raw)
+        match = re.fullmatch(gpio_pattern(row["phase"], fault), raw)
         require(
             len(raw) == end - start
             and digest(raw) == span["sha256"]
             and match is not None
-            and [int(v) for v in match.groups()] == [row["out_register"], row["in_register"]],
+            and [int(v) for v in match.groups()] == [row[k] for k in fields],
             "GPIO observation span content differs",
         )
         cursor = end
@@ -244,7 +338,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
-    gpio = report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
+    fault = report.get("schema_version") == "embedded-sim-runner.gpio-fault-report.v1"
+    gpio = fault or report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
     s3 = report.get("schema_version") == "embedded-sim-runner.qemu-s3-flash-report.v1"
     flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
@@ -258,7 +353,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        GPIO_PROFILE
+        FAULT_PROFILE
+        if fault
+        else GPIO_PROFILE
         if gpio
         else S3_PROFILE
         if s3
@@ -348,7 +445,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.gpio-timer-plan.v1"
+            "embedded-sim-runner.gpio-fault-plan.v1"
+            if fault
+            else "embedded-sim-runner.gpio-timer-plan.v1"
             if gpio
             else "embedded-sim-runner.qemu-s3-flash-plan.v1"
             if s3
@@ -371,7 +470,14 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             all(
                 type(plan.get(k)) is type(v) and plan[k] == v
                 for k, v in summary.items()
-                if k != "gpio_evidence"
+                if k
+                in (
+                    "model_coverage_complete",
+                    "physical_timing_verified",
+                    *GPIO_LABELS,
+                    "fault_scenario",
+                    "fault_scope",
+                )
             ),
             "GPIO plan coverage/semantics differ",
         )
@@ -379,6 +485,11 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             digest(loaded["run.resc"]) == plan.get("script_sha256"), "GPIO script binding differs"
         )
         source.update(summary)
+        if fault:
+            require(
+                plan.get("scenario", {}).get("fault") == summary["fault_request"],
+                "fault request differs from saved plan",
+            )
         source["gpio_observation_spans"] = gpio_spans(
             summary, loaded.get("backend.stdout.bin", b"")
         )

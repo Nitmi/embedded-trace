@@ -1,9 +1,26 @@
 # Offline simulation evidence
 
-Version 0.6.0 accepts `sim-runner-report` in the existing trace input v1 format.
+## Fault reports in the 0.7.0 candidate
+
+The `nrf52840-gpio-timer-fault-v1` adapter preserves `fault_scenario`,
+`fault_scope`, the plan-bound `fault_request`, full native `fault_evidence` and
+`native_errors`, as well as the native nominal verdict and virtual-time declaration.
+Null assertions after a timeout remain null; no effect or regression verdict is
+invented. The four effect selections and explicit `none` control are fixed model
+inputs, not evidence of a physical fault or root cause.
+
+GPIO input/output, TIMER0 counter and IRQ-enable values bind to complete
+`SIM_FAULT_OBS_n` records in raw stdout. Each span includes its original bytes,
+offsets and SHA-256, including the final newline. A truncated final record cannot
+be treated as a complete observation. Inspect/query/Markdown validate saved span
+layout without reopening sources and retain fault context even for UART-only
+filters. Native policy is not rerun; successful import/inspection never converts
+a failed regression or unknown effect into a pass.
+
+Version 0.7.0 is a local candidate accepting `sim-runner-report` in the existing trace input v1 format.
 It reads a selected SHA-256-bound sim-runner 0.1/0.2/0.3 Renode report, QEMU RAM
 report, 0.3/0.4/0.5 C3 ESP-IDF Flash report, 0.4/0.5 Renode GPIO/TIMER0 report,
-or 0.5 Xtensa S3 ESP-IDF Flash report and declared
+or 0.5/0.6 Xtensa S3 ESP-IDF Flash report, 0.6 GPIO/TIMER0 fault report and declared
 adjacent files. It never launches sim-runner/QEMU,
 imports their code, connects to a device or follows instructions from logs.
 
@@ -25,7 +42,8 @@ HIL Runner 0.3/0.4/0.5/0.6 simulation suite emits this input automatically, incl
 failed native reports. No Toolkit/station update or component execution occurs.
 
 Only fixed `nrf52840-uart-v1`, `esp32c3-ram-uart-v1` and
-`esp32c3-idf-flash-v1`, `nrf52840-gpio-timer-v1` and `esp32s3-idf-flash-v1` reports are supported.
+`esp32c3-idf-flash-v1`, `nrf52840-gpio-timer-v1`, `nrf52840-gpio-timer-fault-v1`
+and `esp32s3-idf-flash-v1` reports are supported.
 Only the declared fixed basenames next to the report are opened; recorded absolute
 paths are untrusted metadata. Hashes, sizes, plan/lock/firmware/model bindings,
 simulation flags and declared successful process cleanup are checked. Missing,
