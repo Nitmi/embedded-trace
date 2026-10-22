@@ -1,6 +1,6 @@
 # Offline simulation evidence
 
-## Fault reports in the 0.7.0 candidate
+## Fault reports in 0.7.0
 
 The `nrf52840-gpio-timer-fault-v1` adapter preserves `fault_scenario`,
 `fault_scope`, the plan-bound `fault_request`, full native `fault_evidence` and
@@ -17,7 +17,7 @@ layout without reopening sources and retain fault context even for UART-only
 filters. Native policy is not rerun; successful import/inspection never converts
 a failed regression or unknown effect into a pass.
 
-Version 0.7.0 is a local candidate accepting `sim-runner-report` in the existing trace input v1 format.
+Version 0.7.0 accepts `sim-runner-report` in the existing trace input v1 format.
 It reads a selected SHA-256-bound sim-runner 0.1/0.2/0.3 Renode report, QEMU RAM
 report, 0.3/0.4/0.5 C3 ESP-IDF Flash report, 0.4/0.5 Renode GPIO/TIMER0 report,
 or 0.5/0.6 Xtensa S3 ESP-IDF Flash report, 0.6 GPIO/TIMER0 fault report and declared

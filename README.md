@@ -1,12 +1,12 @@
 # Embedded Trace
 
-The local 0.7.0 candidate adds sim-runner 0.6.0 GPIO/TIMER0 fault reports.
+The published [0.7.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.7.0)
+adds sim-runner 0.6.0 GPIO/TIMER0 fault reports.
 Native fault analysis, failures and unknown effects stay visible in filtered
-queries and Markdown, with raw counter/IRQ snapshot spans. This candidate is not
-a published release; successful import never changes the native verdict.
+queries and Markdown, with raw counter/IRQ snapshot spans. Successful import
+never changes the native verdict.
 
-The published [0.6.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.6.0)
-adds Xtensa ESP32-S3 Flash identity, unmeasured clock and
+It also preserves Xtensa ESP32-S3 Flash identity, unmeasured clock and
 core declarations alongside Renode GPIO/TIMER0 reports with separate guest samples,
 paused model observations and raw stdout spans. It retains ESP-IDF Flash reports and explicit
 `succeeded_with_model_limits` outcomes to offline `sim-runner-report` input alongside saved
@@ -66,13 +66,13 @@ lines remain distinguishable. Log text is rendered as inert JSON code, never as
 Markdown instructions, links or HTML. Keep the complete timeline and native logs
 for full evidence; the report is a readable view, not a hardware verdict.
 
-Version 0.2.0 is currently a local development candidate. It can report existing
+The report command, introduced in 0.2.0, can also read existing
 0.1.0 timelines; the published 0.1.0 release does not include the report command.
 
 See [format and clock semantics](docs/format.md) for limits and interpretation.
 The [synthetic example](examples/synthetic/README.md) works without hardware.
 See [installation and release verification](docs/installation.md) for isolated
-installation, source bindings and the planned attestation procedure.
+installation, source bindings and the attestation procedure.
 
 ## Development
 
@@ -86,6 +86,6 @@ uv run python scripts/package_smoke.py --dist-dir dist --output-dir '<new-smoke-
 ```
 
 The lock binds development dependencies; installed runtime code uses only the
-standard library. [Release 0.1.0](https://github.com/Nitmi/embedded-trace/releases/tag/v0.1.0)
+standard library. [Release 0.7.0](https://github.com/Nitmi/embedded-trace/releases/tag/v0.7.0)
 provides a wheel, source archive, source-bound manifest and checksums. Follow the
 installation guide to authenticate all four assets before installing the wheel.
