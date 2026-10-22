@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — Local candidate
+
+- Separate instrument inspect/query/Markdown views preserve native checks,
+  original sample spans, source qualification and complete global verdicts.
+- Validate self-contained HIL instrument evidence without source-path access,
+  dependencies, native recomputation or invented UTC/timeline alignment.
+
 ## 0.2.0 — Unreleased
 
 - Export deterministic Markdown from one SHA-256-bound validated timeline.

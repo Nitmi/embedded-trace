@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:embedded-hil-runner:instrument-report:v1",
+  "title": "Self-contained recorded instrument verification bundle",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "producer_version", "scope", "ok", "status", "summary", "checks", "evidence_origin", "native_exit_code", "native_recomputation_recorded", "native_recomputed_now", "validation_kind", "junit", "import_spec", "inputs", "hardware_access", "executables_started", "authorization_granted", "physical_device_verified", "physical_timing_verified", "calibration_verified", "endpoint_identity_verified", "report_authenticated", "source_execution_performed"],
+  "properties": {
+    "schema_version": {"const": "embedded-hil-runner.instrument-report.v1"},
+    "producer_version": {"const": "0.9.0"},
+    "scope": {"const": "host_only_saved_instrument_import"},
+    "ok": {"type": "boolean"}, "status": {"enum": ["passed", "failed"]},
+    "summary": {"type": "object", "additionalProperties": false, "required": ["checks", "passed", "failed"], "properties": {"checks": {"type": "integer", "minimum": 1, "maximum": 8}, "passed": {"type": "integer", "minimum": 0, "maximum": 8}, "failed": {"type": "integer", "minimum": 0, "maximum": 8}}},
+    "checks": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "status", "native_sha256"], "properties": {"id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,47}$"}, "kind": {"enum": ["uart", "pwm", "i2c", "spi"]}, "status": {"enum": ["passed", "failed", "invalid_evidence"]}, "native_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}},
+    "evidence_origin": {"enum": ["test_double", "physical_instrument"]},
+    "native_exit_code": {"type": "integer", "enum": [0, 3]},
+    "native_recomputation_recorded": {"const": true}, "native_recomputed_now": {"const": false},
+    "validation_kind": {"const": "recorded_native_verification_and_explicit_input_integrity"},
+    "junit": {"type": "object", "additionalProperties": false, "required": ["tests", "failures", "errors", "skipped"], "properties": {"tests": {"type": "integer", "minimum": 1, "maximum": 8}, "failures": {"type": "integer", "minimum": 0, "maximum": 8}, "errors": {"type": "integer", "minimum": 0, "maximum": 8}, "skipped": {"const": 0}}},
+    "import_spec": {"$ref": "#/$defs/blob"},
+    "inputs": {"type": "object", "additionalProperties": false, "required": ["report", "spec", "capture", "native_result", "junit"], "properties": {"report": {"$ref": "#/$defs/blob"}, "spec": {"$ref": "#/$defs/blob"}, "capture": {"$ref": "#/$defs/blob"}, "native_result": {"$ref": "#/$defs/blob"}, "junit": {"$ref": "#/$defs/blob"}}},
+    "hardware_access": {"const": false}, "executables_started": {"const": false},
+    "authorization_granted": {"const": false}, "physical_device_verified": {"const": false},
+    "physical_timing_verified": {"const": false}, "calibration_verified": {"const": false},
+    "endpoint_identity_verified": {"const": false}, "report_authenticated": {"const": false},
+    "source_execution_performed": {"const": false}
+  },
+  "$defs": {
+    "blob": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "size_bytes", "raw_base64"], "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "size_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576}, "raw_base64": {"type": "string", "maxLength": 1398104}}}
+  }
+}

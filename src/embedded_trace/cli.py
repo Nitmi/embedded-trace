@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__
+from . import __version__, instrument
 from .common import TraceError, json_bytes, write_new
 from .query import inspect, query, validate
 from .report import report
@@ -17,6 +17,21 @@ def parser() -> argparse.ArgumentParser:
     )
     root.add_argument("--version", action="version", version=f"embedded-trace {__version__}")
     commands = root.add_subparsers(dest="operation", required=True)
+    instruments = commands.add_parser("instrument", help="offline HIL instrument evidence views")
+    views = instruments.add_subparsers(dest="instrument_operation", required=True)
+    for name in ("inspect", "query", "report"):
+        item = views.add_parser(name)
+        item.add_argument("input", type=Path)
+        item.add_argument("--sha256", required=True)
+        item.add_argument("--json", action="store_true")
+        if name != "inspect":
+            item.add_argument("--check")
+            item.add_argument("--kind", choices=("uart", "pwm", "i2c", "spi"))
+            item.add_argument("--status", choices=("passed", "failed", "invalid_evidence"))
+            item.add_argument("--offset", type=int, default=0)
+            item.add_argument("--limit", type=int, default=8)
+        if name == "report":
+            item.add_argument("--output", type=Path, required=True)
     build = commands.add_parser("correlate", help="correlate explicitly selected saved logs")
     build.add_argument("input", type=Path)
     build.add_argument("--output", type=Path, required=True)
@@ -41,6 +56,45 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.operation == "instrument":
+        result = {
+            "schema_version": "embedded-trace.instrument-result.v1",
+            "operation": "instrument." + args.instrument_operation,
+            "scope": "host_only_saved_instrument_view",
+            **instrument.FLAGS,
+        }
+        try:
+            filters = (
+                {}
+                if args.instrument_operation == "inspect"
+                else {
+                    key: getattr(args, key)
+                    for key in ("check", "kind", "status", "offset", "limit")
+                }
+            )
+            data = (
+                instrument.markdown(args.input, args.sha256, args.output, **filters)
+                if args.instrument_operation == "report"
+                else instrument.view(args.input, args.sha256, **filters)
+            )
+            if args.instrument_operation == "inspect":
+                data["checks"] = [
+                    {k: c[k] for k in ("id", "kind", "status", "native_sha256")}
+                    for c in data["checks"]
+                ]
+            result.update(ok=True, data=data)
+            code = 0
+        except (TraceError, OSError, ValueError, KeyError, TypeError, RecursionError) as error:
+            result.update(
+                ok=False,
+                error={
+                    "code": getattr(error, "code", "INVALID_INPUT"),
+                    "message": str(error)[:1024],
+                },
+            )
+            code = 2
+        sys.stdout.write(instrument.canonical(result).decode("ascii"))
+        return code
     result = {
         "schema_version": "embedded-trace.result.v1",
         "operation": "trace." + args.operation,

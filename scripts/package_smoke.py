@@ -13,6 +13,8 @@ import tomllib
 import zipfile
 from pathlib import Path
 
+from instrument_smoke import verify as verify_instruments
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -191,6 +193,7 @@ def main() -> None:
         )
     )
     assert error["error"]["code"] == "HASH_MISMATCH" and not drift.exists()
+    assert verify_instruments(run, cli, root)
     package = Path(identity["path"]).parent
     verified = 0
     with zipfile.ZipFile(wheel) as archive:
@@ -198,7 +201,7 @@ def main() -> None:
             if item.filename.startswith("embedded_trace/") and not item.is_dir():
                 assert (package.parent / item.filename).read_bytes() == archive.read(item)
                 verified += 1
-    assert verified == 14  # Eleven modules and three schemas; no runtime dependency.
+    assert verified == 16  # Twelve modules and four schemas; no runtime dependency.
     for value in (correlated, inspected, found, overlapped, rendered):
         assert value["hardware_access"] is False and value["executables_started"] is False
         assert value["cross_source_clock_alignment_verified"] is False
@@ -208,6 +211,7 @@ def main() -> None:
         "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
         "identity": identity,
         "package_files_verified": verified,
+        "instrument_views_verified": True,
         "commands": commands,
         "hardware_access": False,
     }

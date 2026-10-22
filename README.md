@@ -1,5 +1,9 @@
 # Embedded Trace
 
+Local **0.9.0** adds [instrument evidence views](docs/instrument.md): inspect,
+filter and report saved HIL instrument checks with original raw sample references,
+global failures and source qualification, separate from timestamped timelines.
+
 The published [0.8.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.8.0) adds offline ESP-EMU WASM reports from sim-runner 0.7.0.
 String UART provenance, model limitations, restart requests, budget failures and
 unknown observations stay visible in filtered views;
