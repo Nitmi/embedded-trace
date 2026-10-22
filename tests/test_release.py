@@ -36,9 +36,9 @@ MODULES = (
 )
 
 
-def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None):
+def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, version=VERSION):
     """Independent minimal distribution fixture; contents are never imported."""
-    metadata = "embedded_trace-0.1.0.dist-info/"
+    metadata = f"embedded_trace-{version}.dist-info/"
     wheel = {"embedded_trace/" + name: b"# synthetic module\n" for name in MODULES}
     wheel.update(
         {
@@ -46,10 +46,16 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None):
             for name in ("input", "result", "timeline")
         }
     )
+    if tuple(map(int, version.split("."))) >= (0, 3, 0):
+        wheel["embedded_trace/simulation.py"] = b"# synthetic simulation module\n"
+    if tuple(map(int, version.split("."))) >= (0, 9, 0):
+        wheel["embedded_trace/instrument.py"] = b"# synthetic instrument module\n"
+        wheel["embedded_trace/schemas/instrument-report.schema.json"] = b"{}\n"
     wheel.update(
         {
-            metadata
-            + "METADATA": b"Name: embedded-trace\nVersion: 0.1.0\nRequires-Python: >=3.11\n",
+            metadata + "METADATA": (
+                f"Name: embedded-trace\nVersion: {version}\nRequires-Python: >=3.11\n"
+            ).encode(),
             metadata + "WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
             metadata
             + "entry_points.txt": b"[console_scripts]\nembedded-trace = embedded_trace.cli:main\n",
@@ -57,18 +63,23 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None):
         }
     )
     source = {
-        "pyproject.toml": b'[project]\nname="embedded-trace"\nversion="0.1.0"\n'
-        b'requires-python=">=3.11"\ndependencies=[]\n[project.scripts]\n'
-        b'embedded-trace="embedded_trace.cli:main"\n',
+        "pyproject.toml": (
+            f'[project]\nname="embedded-trace"\nversion="{version}"\n'
+            'requires-python=">=3.11"\ndependencies=[]\n[project.scripts]\n'
+            'embedded-trace="embedded_trace.cli:main"\n'
+        ).encode(),
         "README.md": b"synthetic readme\n",
         "LICENSE": wheel[metadata + "licenses/LICENSE"],
         "PKG-INFO": wheel[metadata + "METADATA"],
     }
     source.update(
-        {"src/embedded_trace/" + name: wheel["embedded_trace/" + name] for name in MODULES}
-    )
-    source.update(
-        {f"schemas/{name}.v1.schema.json": b"{}\n" for name in ("input", "result", "timeline")}
+        {
+            name.replace("embedded_trace/schemas/", "schemas/", 1)
+            if "/schemas/" in name
+            else "src/" + name: raw
+            for name, raw in wheel.items()
+            if name.startswith("embedded_trace/")
+        }
     )
     if mutate:
         mutate(wheel, source)
@@ -79,7 +90,7 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None):
         writer.writerow([name, "sha256=" + encoded, len(raw)])
     writer.writerow([metadata + "RECORD", "", ""])
     wheel[metadata + "RECORD"] = records.getvalue().encode()
-    wheel_name, source_name = release.names(VERSION)
+    wheel_name, source_name = release.names(version)
     with zipfile.ZipFile(directory / wheel_name, "w") as archive:
         for name, data in wheel.items():
             item = zipfile.ZipInfo("placeholder")
@@ -89,7 +100,7 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None):
             extra_wheel(archive)
     with tarfile.open(directory / source_name, "w:gz") as archive:
         for name, data in source.items():
-            item = tarfile.TarInfo("embedded_trace-0.1.0/" + name)
+            item = tarfile.TarInfo(f"embedded_trace-{version}/" + name)
             item.size = len(data)
             archive.addfile(item, io.BytesIO(data))
         if extra_source:
@@ -101,6 +112,23 @@ def manifest_edit(directory, change):
     value = json.loads(path.read_bytes())
     change(value)
     path.write_bytes((json.dumps(value, sort_keys=True) + "\n").encode())
+
+
+def test_instrument_release_accepts_complete_new_payloads(tmp_path):
+    archives(tmp_path, version="0.9.0")
+    release.create_manifest(tmp_path, "0.9.0", REVISION)
+    report = release.verify(tmp_path, REVISION)
+    assert report["ok"] and report["wheel_members"] == 21 and report["source_members"] == 20
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["embedded_trace/instrument.py", "embedded_trace/schemas/instrument-report.schema.json"],
+)
+def test_instrument_release_rejects_incomplete_payloads_even_with_valid_record(tmp_path, missing):
+    archives(tmp_path, version="0.9.0", mutate=lambda wheel, source: wheel.pop(missing))
+    with pytest.raises(ValueError, match="Unexpected/missing wheel files"):
+        release.create_manifest(tmp_path, "0.9.0", REVISION)
 
 
 def test_verify_binds_bytes_but_does_not_claim_publisher_authentication(tmp_path, monkeypatch):

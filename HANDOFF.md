@@ -24,6 +24,9 @@ Pitfalls and boundaries:
   Full native evidence stays in the bundle. Do not render untrusted log markup.
 - Changes to installed modules/schemas must update the exact package smoke file
   inventory. New schema/fixture files must be staged before sdist construction.
+- The release verifier has a separate version-aware exact wheel inventory.
+  Instrument 0.9.0 requires both instrument.py and its report schema there too;
+  runtime/package-smoke success alone does not qualify a release build.
 
 Each query validates all bundle bytes (up to 8 MiB), regardless of page length.
 Base64/JSON parsing and comparison allocate extra memory. Include measured wall
