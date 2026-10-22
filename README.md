@@ -1,11 +1,11 @@
 # Embedded Trace
 
-Local 0.8.0 development adds offline ESP-EMU WASM reports from sim-runner 0.7.0.
+The published [0.8.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.8.0) adds offline ESP-EMU WASM reports from sim-runner 0.7.0.
 String UART provenance, model limitations, restart requests, budget failures and
-unknown observations stay visible in filtered views. The candidate is not published;
+unknown observations stay visible in filtered views;
 see [simulation evidence](docs/simulation.md).
 
-The published [0.7.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.7.0)
+The [0.7.0 release](https://github.com/Nitmi/embedded-trace/releases/tag/v0.7.0)
 adds sim-runner 0.6.0 GPIO/TIMER0 fault reports.
 Native fault analysis, failures and unknown effects stay visible in filtered
 queries and Markdown, with raw counter/IRQ snapshot spans. Successful import

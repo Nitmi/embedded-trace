@@ -1,8 +1,8 @@
 # Offline simulation evidence
 
-## Experimental ESP-EMU WASM in local 0.8.0
+## Experimental ESP-EMU WASM in 0.8.0
 
-The unpublished candidate accepts `embedded-sim-runner.esp-wasm-report.v1`
+Embedded Trace 0.8.0 accepts `embedded-sim-runner.esp-wasm-report.v1`
 for `esp32c3-wasm-flash-v1`. Only the fixed adjacent artifacts and four fixed
 `component/` files are read. Source evidence stays bounded to 12 MiB (96 MiB
 for a simulation selection); recorded absolute paths are never followed.
