@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import json
 import re
 from pathlib import Path
 
@@ -241,7 +242,8 @@ def wasm_binding(report, plan, loaded, source):
                 seen["stop_reason"] != "instruction_budget"
                 or seen["requested_instruction_upper_bound"] == budget
             )
-            and parse_json(loaded.get("backend.stdout.bin", b"")) == seen,
+            and json.dumps(parse_json(loaded.get("backend.stdout.bin", b"")), sort_keys=True)
+            == json.dumps(seen, sort_keys=True),
             "WASM saved host summary/encoded UART differs",
         )
     source.update(summary)

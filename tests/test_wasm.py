@@ -195,7 +195,17 @@ def test_timeline_cannot_drop_or_relabel_wasm_context(tmp_path, key, value):
 
 @pytest.mark.parametrize(
     "mutation",
-    ["path", "clock", "unqualified", "component", "stdout", "restart", "nominal-clock", "unicode"],
+    [
+        "path",
+        "clock",
+        "unqualified",
+        "component",
+        "stdout",
+        "restart",
+        "nominal-clock",
+        "unicode",
+        "stdout-type",
+    ],
 )
 def test_import_rejects_inconsistent_saved_evidence(tmp_path, mutation):
     path = evidence(tmp_path / "native")
@@ -210,6 +220,13 @@ def test_import_rejects_inconsistent_saved_evidence(tmp_path, mutation):
         (path.parent / "component/LICENSE").write_bytes(b"drift")
     elif mutation == "stdout":
         doc["runtime_observation"]["cycle_counter"] = "321"
+    elif mutation == "stdout-type":
+        # Python equality aliases True and 1; saved JSON declarations must not.
+        value = json.loads((path.parent / "backend.stdout.bin").read_bytes())
+        value["harts"] = True
+        raw = json.dumps(value).encode()
+        (path.parent / "backend.stdout.bin").write_bytes(raw)
+        doc["artifacts"]["backend.stdout.bin"].update(bytes=len(raw), sha256=digest(raw))
     elif mutation == "restart":
         doc["runtime_observation"]["restart_performed"] = True
     elif mutation == "nominal-clock":
