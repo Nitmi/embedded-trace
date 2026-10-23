@@ -46,6 +46,20 @@ def test_mixed_failure_error_keeps_full_global_verdict_under_filtering(tmp_path)
     assert empty["selected_count"] == 0 and not empty["verdict"]["ok"]
 
 
+@pytest.mark.parametrize("version", ["0.9.0", "0.10.0"])
+def test_old_and_current_hil_digital_producers_match_runtime_and_schema(tmp_path, version):
+    import jsonschema
+
+    path, _ = case(tmp_path)
+    bundle = json.loads(path.read_bytes())
+    bundle["producer_version"] = version
+    schema = json.loads(
+        (EXAMPLES.parents[1] / "schemas/instrument-report.schema.json").read_bytes()
+    )
+    jsonschema.validate(bundle, schema)
+    assert instrument.view(path, write(path, bundle))["verdict"]["ok"] is False
+
+
 def test_full_native_spans_and_invalid_signal_survive(tmp_path):
     path, sha = case(tmp_path)
     check = instrument.view(path, sha, check="console")["checks"][0]
@@ -86,7 +100,7 @@ def test_views_never_open_recorded_sources_or_start_processes(tmp_path, monkeypa
         ("ok", True),
         ("ok", 0),
         ("status", "passed"),
-        ("producer_version", "0.10.0"),
+        ("producer_version", "99.0.0"),
         ("native_exit_code", True),
         ("native_recomputation_recorded", False),
         ("validation_kind", "authenticated"),

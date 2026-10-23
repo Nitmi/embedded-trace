@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, instrument
+from . import __version__, instrument, waveform
 from .common import TraceError, json_bytes, write_new
 from .query import inspect, query, validate
 from .report import report
@@ -27,6 +27,21 @@ def parser() -> argparse.ArgumentParser:
         if name != "inspect":
             item.add_argument("--check")
             item.add_argument("--kind", choices=("uart", "pwm", "i2c", "spi"))
+            item.add_argument("--status", choices=("passed", "failed", "invalid_evidence"))
+            item.add_argument("--offset", type=int, default=0)
+            item.add_argument("--limit", type=int, default=8)
+        if name == "report":
+            item.add_argument("--output", type=Path, required=True)
+    waves = commands.add_parser("waveform", help="offline saved voltage checks")
+    wave_views = waves.add_subparsers(dest="instrument_operation", required=True)
+    for name in ("inspect", "query", "report"):
+        item = wave_views.add_parser(name)
+        item.add_argument("input", type=Path)
+        item.add_argument("--sha256", required=True)
+        item.add_argument("--json", action="store_true")
+        if name != "inspect":
+            item.add_argument("--check")
+            item.add_argument("--channel", type=int, choices=(1, 2, 3, 4))
             item.add_argument("--status", choices=("passed", "failed", "invalid_evidence"))
             item.add_argument("--offset", type=int, default=0)
             item.add_argument("--limit", type=int, default=8)
@@ -56,12 +71,13 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    if args.operation == "instrument":
+    if args.operation in ("instrument", "waveform"):
+        evidence = waveform if args.operation == "waveform" else instrument
         result = {
-            "schema_version": "embedded-trace.instrument-result.v1",
-            "operation": "instrument." + args.instrument_operation,
-            "scope": "host_only_saved_instrument_view",
-            **instrument.FLAGS,
+            "schema_version": "embedded-trace." + args.operation + "-result.v1",
+            "operation": args.operation + "." + args.instrument_operation,
+            "scope": "host_only_saved_" + args.operation + "_view",
+            **evidence.FLAGS,
         }
         try:
             filters = (
@@ -69,15 +85,21 @@ def main(argv: list[str] | None = None) -> int:
                 if args.instrument_operation == "inspect"
                 else {
                     key: getattr(args, key)
-                    for key in ("check", "kind", "status", "offset", "limit")
+                    for key in (
+                        "check",
+                        "channel" if args.operation == "waveform" else "kind",
+                        "status",
+                        "offset",
+                        "limit",
+                    )
                 }
             )
             data = (
-                instrument.markdown(args.input, args.sha256, args.output, **filters)
+                evidence.markdown(args.input, args.sha256, args.output, **filters)
                 if args.instrument_operation == "report"
-                else instrument.view(args.input, args.sha256, **filters)
+                else evidence.view(args.input, args.sha256, **filters)
             )
-            if args.instrument_operation == "inspect":
+            if args.instrument_operation == "inspect" and args.operation == "instrument":
                 data["checks"] = [
                     {k: c[k] for k in ("id", "kind", "status", "native_sha256")}
                     for c in data["checks"]
@@ -93,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
                 },
             )
             code = 2
-        sys.stdout.write(instrument.canonical(result).decode("ascii"))
+        sys.stdout.write(evidence.canonical(result).decode("ascii"))
         return code
     result = {
         "schema_version": "embedded-trace.result.v1",

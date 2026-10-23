@@ -51,6 +51,9 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, ver
     if tuple(map(int, version.split("."))) >= (0, 9, 0):
         wheel["embedded_trace/instrument.py"] = b"# synthetic instrument module\n"
         wheel["embedded_trace/schemas/instrument-report.schema.json"] = b"{}\n"
+    if tuple(map(int, version.split("."))) >= (0, 10, 0):
+        wheel["embedded_trace/waveform.py"] = b"# synthetic waveform module\n"
+        wheel["embedded_trace/schemas/waveform-report.schema.json"] = b"{}\n"
     wheel.update(
         {
             metadata + "METADATA": (
@@ -119,6 +122,22 @@ def test_instrument_release_accepts_complete_new_payloads(tmp_path):
     release.create_manifest(tmp_path, "0.9.0", REVISION)
     report = release.verify(tmp_path, REVISION)
     assert report["ok"] and report["wheel_members"] == 21 and report["source_members"] == 20
+
+
+def test_waveform_release_accepts_complete_new_payloads(tmp_path):
+    archives(tmp_path, version="0.10.0")
+    release.create_manifest(tmp_path, "0.10.0", REVISION)
+    report = release.verify(tmp_path, REVISION)
+    assert report["ok"] and report["wheel_members"] == 23 and report["source_members"] == 22
+
+
+@pytest.mark.parametrize(
+    "missing", ["embedded_trace/waveform.py", "embedded_trace/schemas/waveform-report.schema.json"]
+)
+def test_waveform_release_requires_module_and_schema(tmp_path, missing):
+    archives(tmp_path, version="0.10.0", mutate=lambda wheel, source: wheel.pop(missing))
+    with pytest.raises(ValueError, match="Unexpected/missing wheel files"):
+        release.create_manifest(tmp_path, "0.10.0", REVISION)
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,10 @@
 # Embedded Trace
 
-Local **0.9.0** adds [instrument evidence views](docs/instrument.md): inspect,
+Local **0.10.0** adds [saved analog waveform views](docs/waveform.md):
+filter AD3/SDS804X checks by ID, channel or status while retaining the full
+verdict, voltage metrics, raw byte spans and unverified measurement claims.
+
+The **0.9.0** release adds [instrument evidence views](docs/instrument.md): inspect,
 filter and report saved HIL instrument checks with original raw sample references,
 global failures and source qualification, separate from timestamped timelines.
 

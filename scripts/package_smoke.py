@@ -201,7 +201,7 @@ def main() -> None:
             if item.filename.startswith("embedded_trace/") and not item.is_dir():
                 assert (package.parent / item.filename).read_bytes() == archive.read(item)
                 verified += 1
-    assert verified == 16  # Twelve modules and four schemas; no runtime dependency.
+    assert verified == 18  # Thirteen modules and five schemas; no runtime dependency.
     for value in (correlated, inspected, found, overlapped, rendered):
         assert value["hardware_access"] is False and value["executables_started"] is False
         assert value["cross_source_clock_alignment_verified"] is False
