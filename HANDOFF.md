@@ -68,3 +68,17 @@ Native recomputation and HIL canonical XML validation remain historical records;
   otherwise change source archive payloads despite clean status and passing tests.
   Keep one named bundle per scenario; generator reruns must not add duplicate
   `*-bundle.json` copies beside the canonical fixture names.
+
+## Release-preparation digital compatibility correction
+
+Current lab0.9 generates digital reports as well as waveform reports. Keep the
+digital path usable with the jointly selected new component versions: verifier
+0.8 supports producers0.7/0.8, verifier0.9 supports producers0.7/0.8/0.9. Reject
+unknown or impossible version pairs, retain original hashes/verdicts/flags, and
+keep `hil_import_checks_reperformed=false`; Trace still does not rebuild XML or
+decode signals. Actual lab0.9/HIL fixtures are in examples/instrument-09, including
+a genuine native0.9 recheck of a saved producer0.8 report. Installed smoke covers
+these five cases in addition to historical digital/waveform views. This fixes a
+cross-component release-preflight gap, not a change in decoding semantics.
+The initial 140b8eca candidate remains frozen; release preparation must select
+the newly validated candidate source and hashes before requesting publication.

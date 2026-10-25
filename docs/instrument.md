@@ -7,8 +7,12 @@ The existing serial/RTT/simulation timeline format and commands remain separate.
 Instrument samples lack a verified UTC origin; putting them on that host-time
 timeline would imply a relationship the evidence does not establish.
 
-Use a bundle produced by HIL 0.9.0 `instrument import` after the native
-lab-instruments 0.8.0 verification/JUnit command. Keep its SHA-256:
+Use a bundle produced by HIL 0.9.0 or 0.10.0 `instrument import` after native
+lab-instruments verification/JUnit. Verifier 0.8.0 supports report producers
+0.7.0/0.8.0; verifier 0.9.0 supports 0.7.0/0.8.0/0.9.0. Unknown or impossible
+producer/verifier pairs fail. The recorded HIL canonical XML check is not rerun
+by Trace; no version is relabeled and historical execution remains unauthenticated.
+Keep the bundle SHA-256:
 
 ```powershell
 embedded-trace instrument inspect '<bundle.json>' --sha256 '<sha256>' --json

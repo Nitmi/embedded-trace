@@ -45,6 +45,10 @@ NATIVE_FLAGS = {
         "endpoint_identity_verified",
     )
 }
+VERIFIER_PRODUCERS = {
+    "0.8.0": ("0.7.0", "0.8.0"),
+    "0.9.0": ("0.7.0", "0.8.0", "0.9.0"),
+}
 
 
 def canonical(value):
@@ -156,7 +160,7 @@ def load(path, sha):
     )
     require(
         report.get("schema_version") == "lab-instruments.logic-check-report.v1"
-        and report.get("runner_version") in ("0.7.0", "0.8.0")
+        and report.get("runner_version") in ("0.7.0", "0.8.0", "0.9.0")
         and report.get("scope") == "host_only_saved_logic_evaluation"
         and report.get("complete") is True
         and all(report.get(k) is False for k in NATIVE_FLAGS),
@@ -283,7 +287,8 @@ def load(path, sha):
     verified = response["data"]["verification"]
     require(
         verified.get("schema_version") == "lab-instruments.logic-check-verification.v1"
-        and verified.get("verifier_version") == "0.8.0"
+        and type(verified.get("verifier_version")) is str
+        and report["runner_version"] in VERIFIER_PRODUCERS.get(verified["verifier_version"], ())
         and verified.get("ok") is True
         and verified.get("status") == "verified"
         and verified.get("complete") is True

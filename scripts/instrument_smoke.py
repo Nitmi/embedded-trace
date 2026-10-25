@@ -32,6 +32,21 @@ def verify(run, cli, root):
             json.loads(run("instrument-" + scenario + "-bad-hash", bad, 2))["error"]["code"]
             == "HASH_MISMATCH"
         )
+    examples = Path(__file__).resolve().parents[1] / "examples/instrument-09"
+    for scenario in ("passed", "failed", "invalid", "mixed", "legacy"):
+        path = root / ("digital09-" + scenario + ".json")
+        path.write_bytes((examples / (scenario + ".json")).read_bytes())
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        for operation in ("inspect", "query", "report"):
+            args = [*cli, "instrument", operation, str(path), "--sha256", sha, "--json"]
+            if operation == "query":
+                args += ["--status", "passed"]
+            if operation == "report":
+                args += ["--output", str(root / ("digital09-" + scenario + ".md"))]
+            response = json.loads(run("digital09-" + scenario + "-" + operation, args))
+            assert response["ok"] and response["data"]["verdict"]["ok"] is (
+                scenario in ("passed", "legacy")
+            )
     examples = Path(__file__).resolve().parents[1] / "examples/waveform"
     for scenario in ("passed", "failed", "invalid", "mixed", "sds"):
         path = root / ("waveform-" + scenario + ".json")
