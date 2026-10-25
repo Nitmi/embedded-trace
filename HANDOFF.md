@@ -64,3 +64,7 @@ Native recomputation and HIL canonical XML validation remain historical records;
 - Measure whole-bundle validation even for a passing-only or empty query.
   Base64, JSON and canonical comparisons allocate copies, beyond file limits;
   Python allocation peaks do not establish process RSS or worst-case latency.
+- Preserve hash-bound waveform fixture bytes via `-text`; Git normalization may
+  otherwise change source archive payloads despite clean status and passing tests.
+  Keep one named bundle per scenario; generator reruns must not add duplicate
+  `*-bundle.json` copies beside the canonical fixture names.

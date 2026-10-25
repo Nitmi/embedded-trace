@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.jsonl text eol=lf
+examples/waveform/** -text -diff
+examples/waveform/README.md text eol=lf diff
