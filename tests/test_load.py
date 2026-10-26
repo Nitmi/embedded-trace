@@ -172,9 +172,7 @@ def test_cli_processing_succeeds_with_failed_test_and_query_empty(tmp_path, caps
     ],
 )
 def test_release_exact_inventory_requires_new_payloads(tmp_path, missing):
-    from test_release import REVISION, archives
-
-    from scripts import release
+    from test_release import REVISION, archives, release
 
     archives(tmp_path, version="0.11.0", mutate=lambda w, s: w.pop(missing))
     with pytest.raises(ValueError, match="Unexpected/missing wheel"):

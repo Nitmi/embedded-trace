@@ -3,6 +3,13 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Release CI found that tests/test_load.py imported scripts as a package, relying
+on `python -m pytest` putting the checkout on sys.path. The CI `pytest` launcher
+does not guarantee this. Reuse test_release's explicit file-loaded release
+module instead of changing sys.path, the runtime or the CI entry point. Exercise
+both invocation forms in release acceptance. This changes tests/handoff only;
+the accepted 0.11 wheel must remain byte-identical. No tag existed at the fix.
+
 Current local work is 0.11.0 on feat/offline-load-evidence; 0.10.0 was already
 published, so older unpublished notes below are historical. See docs/load.md.
 The load protocol kernel is vendored byte-identically with HIL, but both runtimes
