@@ -3,3 +3,6 @@
 examples/waveform/** -text -diff
 examples/waveform/README.md text eol=lf diff
 examples/instrument-09/** -text -diff
+examples/load/** -text -diff
+examples/instrument-10/** -text -diff
+examples/waveform-10/** -text -diff

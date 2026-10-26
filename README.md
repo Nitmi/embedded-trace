@@ -1,6 +1,11 @@
 # Embedded Trace
 
-Local **0.10.0** adds [saved analog waveform views](docs/waveform.md):
+Local **0.11.0** adds [saved load evidence views](docs/load.md): inspect,
+filter and report SDL1020X-E assertions with original V/I/P query bytes,
+complete verdicts and failed/unknown cleanup. Actual lab 0.10 digital/waveform
+reports are also accepted without changing their evidence formats.
+
+The **0.10.0** release adds [saved analog waveform views](docs/waveform.md):
 filter AD3/SDS804X checks by ID, channel or status while retaining the full
 verdict, voltage metrics, raw byte spans and unverified measurement claims.
 

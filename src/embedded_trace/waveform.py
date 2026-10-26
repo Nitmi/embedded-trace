@@ -93,7 +93,7 @@ def load(path, sha):
     )
     require(
         bundle["schema_version"] == "embedded-hil-runner.waveform-report.v1"
-        and bundle["producer_version"] == "0.10.0"
+        and bundle["producer_version"] in ("0.10.0", "0.11.0")
         and bundle["scope"] == "host_only_saved_waveform_import"
         and bundle["native_recomputation_recorded"] is True
         and bundle["validation_kind"]
@@ -156,7 +156,7 @@ def load(path, sha):
     )
     require(
         report["schema_version"] == "lab-instruments.waveform-check-report.v1"
-        and report["runner_version"] == "0.9.0"
+        and report["runner_version"] in ("0.9.0", "0.10.0")
         and report["complete"] is True
         and report["scope"] == "host_only_saved_waveform_evaluation"
         and contract["schema_version"] == "lab-instruments.waveform-check-spec.v1",
@@ -306,6 +306,13 @@ def load(path, sha):
         require(native[key] is False, "native CLI claims upgraded")
     same(native["ok"], report["ok"], "native CLI verdict differs")
     verified = native["data"]["verification"]
+    verifier_version = verified.get("verifier_version")
+    require(
+        verifier_version == "0.10.0"
+        or verifier_version == "0.9.0"
+        and report["runner_version"] == "0.9.0",
+        "unsupported native waveform producer/verifier pair",
+    )
     bindings = {}
     for role in ("spec", "capture"):
         supplied = verified["bindings"][role]["supplied"]
@@ -324,8 +331,8 @@ def load(path, sha):
             "status": "verified",
             "report": verified["report"],
             "bindings": bindings,
-            "producer_runner_version": "0.9.0",
-            "verifier_version": "0.9.0",
+            "producer_runner_version": report["runner_version"],
+            "verifier_version": verifier_version,
             "verdict": {k: report[k] for k in ("ok", "status", "summary")},
             "scope": "host_only_saved_waveform_verification",
             **NATIVE_FLAGS,

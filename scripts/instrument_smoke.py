@@ -64,4 +64,33 @@ def verify(run, cli, root):
             )
             assert not response["native_recomputed_now"] and not response["hardware_access"]
             assert response["data"]["source"]["evidence_origin"] == "test_double"
+    for domain, directory, scenarios in (
+        ("load", "load", ("passed", "failed", "invalid", "mixed", "cleanup", "timeout")),
+        ("instrument", "instrument-10", ("passed", "failed", "invalid", "mixed", "legacy")),
+        ("waveform", "waveform-10", ("passed", "failed", "invalid")),
+    ):
+        for scenario in scenarios:
+            path = root / (directory + "-" + scenario + ".json")
+            path.write_bytes(
+                (
+                    Path(__file__).resolve().parents[1]
+                    / "examples"
+                    / directory
+                    / (scenario + ".json")
+                ).read_bytes()
+            )
+            sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            for operation in ("inspect", "query", "report"):
+                args = [*cli, domain, operation, str(path), "--sha256", sha, "--json"]
+                if operation == "query":
+                    args += ["--status", "passed"]
+                if operation == "report":
+                    args += ["--output", str(root / (directory + "-" + scenario + ".md"))]
+                response = json.loads(run(directory + "-" + scenario + "-" + operation, args))
+                assert response["ok"] and response["data"]["verdict"]["ok"] is (
+                    scenario in ("passed", "legacy")
+                )
+                assert not response["hardware_access"] and not response["native_recomputed_now"]
+                source = response["data"] if domain == "instrument" else response["data"]["source"]
+                assert source["evidence_origin"] == "test_double"
     return True

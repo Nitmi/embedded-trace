@@ -48,6 +48,7 @@ NATIVE_FLAGS = {
 VERIFIER_PRODUCERS = {
     "0.8.0": ("0.7.0", "0.8.0"),
     "0.9.0": ("0.7.0", "0.8.0", "0.9.0"),
+    "0.10.0": ("0.7.0", "0.8.0", "0.9.0", "0.10.0"),
 }
 
 
@@ -129,7 +130,7 @@ def load(path, sha):
     )
     require(
         bundle["schema_version"] == "embedded-hil-runner.instrument-report.v1"
-        and bundle["producer_version"] in ("0.9.0", "0.10.0")
+        and bundle["producer_version"] in ("0.9.0", "0.10.0", "0.11.0")
         and bundle["scope"] == "host_only_saved_instrument_import"
         and bundle["native_recomputation_recorded"] is True
         and bundle["validation_kind"] == "recorded_native_verification_and_explicit_input_integrity"
@@ -160,7 +161,7 @@ def load(path, sha):
     )
     require(
         report.get("schema_version") == "lab-instruments.logic-check-report.v1"
-        and report.get("runner_version") in ("0.7.0", "0.8.0", "0.9.0")
+        and report.get("runner_version") in ("0.7.0", "0.8.0", "0.9.0", "0.10.0")
         and report.get("scope") == "host_only_saved_logic_evaluation"
         and report.get("complete") is True
         and all(report.get(k) is False for k in NATIVE_FLAGS),

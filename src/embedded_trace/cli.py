@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, instrument, waveform
+from . import load as load_evidence
 from .common import TraceError, json_bytes, write_new
 from .query import inspect, query, validate
 from .report import report
@@ -48,6 +49,21 @@ def parser() -> argparse.ArgumentParser:
         if name == "report":
             item.add_argument("--output", type=Path, required=True)
     build = commands.add_parser("correlate", help="correlate explicitly selected saved logs")
+    loads = commands.add_parser("load", help="offline saved electronic load checks")
+    load_views = loads.add_subparsers(dest="instrument_operation", required=True)
+    for name in ("inspect", "query", "report"):
+        item = load_views.add_parser(name)
+        item.add_argument("input", type=Path)
+        item.add_argument("--sha256", required=True)
+        item.add_argument("--json", action="store_true")
+        if name != "inspect":
+            item.add_argument("--check")
+            item.add_argument("--phase", choices=("before_load", "loaded", "observe"))
+            item.add_argument("--status", choices=("passed", "failed", "invalid_evidence"))
+            item.add_argument("--offset", type=int, default=0)
+            item.add_argument("--limit", type=int, default=8)
+        if name == "report":
+            item.add_argument("--output", type=Path, required=True)
     build.add_argument("input", type=Path)
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--json", action="store_true")
@@ -71,8 +87,10 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    if args.operation in ("instrument", "waveform"):
-        evidence = waveform if args.operation == "waveform" else instrument
+    if args.operation in ("instrument", "waveform", "load"):
+        evidence = {"instrument": instrument, "waveform": waveform, "load": load_evidence}[
+            args.operation
+        ]
         result = {
             "schema_version": "embedded-trace." + args.operation + "-result.v1",
             "operation": args.operation + "." + args.instrument_operation,
@@ -87,7 +105,9 @@ def main(argv: list[str] | None = None) -> int:
                     key: getattr(args, key)
                     for key in (
                         "check",
-                        "channel" if args.operation == "waveform" else "kind",
+                        {"waveform": "channel", "instrument": "kind", "load": "phase"}[
+                            args.operation
+                        ],
                         "status",
                         "offset",
                         "limit",

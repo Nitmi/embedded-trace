@@ -3,6 +3,21 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local work is 0.11.0 on feat/offline-load-evidence; 0.10.0 was already
+published, so older unpublished notes below are historical. See docs/load.md.
+The load protocol kernel is vendored byte-identically with HIL, but both runtimes
+remain independent stdlib-only packages. It checks original bindings and record
+consistency, not native SCPI replay or HIL's canonical XML reconstruction.
+
+Keep raw-query cache keys command-specific and verify transaction indices against
+transcript command starts. Reject huge integers by bounds before float conversion.
+Whole-bundle validation precedes all filters, with global verdict/JUnit outside
+any truncated Markdown source preview. Unknown cleanup and failed-source partial
+measurements never become a passing selected page. Installed inventory is now
+21 package files (15 modules, six schemas); cold smoke must use only Trace's
+wheel. Joint lab0.10/HIL0.11/Trace0.11 acceptance also covers actual digital and
+waveform outputs, including unchanged older producers reverified by lab0.10.
+
 Local 0.9.0 instrument inspect/query/report consumes HIL 0.9.0 self-contained
 saved evidence. Keep runtime standard-library-only and file-only. Do not import
 HIL/lab packages or launch their executables. See docs/instrument.md.

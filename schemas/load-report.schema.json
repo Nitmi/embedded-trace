@@ -1,0 +1,390 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "embedded-hil-runner.load-report.v1"
+    },
+    "producer_version": {
+      "const": "0.11.0"
+    },
+    "scope": {
+      "const": "host_only_saved_load_import"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "summary": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object"
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object"
+      }
+    },
+    "native_exit_code": {
+      "type": "integer",
+      "enum": [
+        0,
+        3
+      ]
+    },
+    "native_recomputation_recorded": {
+      "const": true
+    },
+    "validation_kind": {
+      "const": "recorded_native_verification_and_explicit_input_integrity"
+    },
+    "junit": {
+      "type": "object"
+    },
+    "import_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "raw_base64"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "raw_base64": {
+          "type": "string",
+          "maxLength": 1398104
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report",
+        "spec",
+        "capture",
+        "native_result",
+        "junit",
+        "plan",
+        "transcript"
+      ],
+      "properties": {
+        "report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 1398104
+            }
+          }
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 87384
+            }
+          }
+        },
+        "capture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 1398104
+            }
+          }
+        },
+        "native_result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 131072
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 174764
+            }
+          }
+        },
+        "junit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 1398104
+            }
+          }
+        },
+        "plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 43692
+            }
+          }
+        },
+        "transcript": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "size_bytes",
+            "raw_base64"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576
+            },
+            "raw_base64": {
+              "type": "string",
+              "maxLength": 1398104
+            }
+          }
+        }
+      }
+    },
+    "hardware_access": {
+      "const": false
+    },
+    "executables_started": {
+      "const": false
+    },
+    "outputs_commanded": {
+      "const": false
+    },
+    "authorization_granted": {
+      "const": false
+    },
+    "physical_device_verified": {
+      "const": false
+    },
+    "dut_identity_verified": {
+      "const": false
+    },
+    "calibration_verified": {
+      "const": false
+    },
+    "physical_timing_verified": {
+      "const": false
+    },
+    "simultaneous_measurements_verified": {
+      "const": false
+    },
+    "energy_measured": {
+      "const": false
+    },
+    "report_authenticated": {
+      "const": false
+    },
+    "recorded_paths_followed": {
+      "const": false
+    },
+    "instrument_state_current_verified": {
+      "const": false
+    },
+    "native_recomputed_now": {
+      "const": false
+    },
+    "source_execution_performed": {
+      "const": false
+    },
+    "native_scpi_replay_performed": {
+      "const": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "producer_version",
+    "scope",
+    "ok",
+    "status",
+    "summary",
+    "source",
+    "checks",
+    "native_exit_code",
+    "native_recomputation_recorded",
+    "validation_kind",
+    "junit",
+    "import_spec",
+    "inputs",
+    "hardware_access",
+    "executables_started",
+    "outputs_commanded",
+    "authorization_granted",
+    "physical_device_verified",
+    "dut_identity_verified",
+    "calibration_verified",
+    "physical_timing_verified",
+    "simultaneous_measurements_verified",
+    "energy_measured",
+    "report_authenticated",
+    "recorded_paths_followed",
+    "instrument_state_current_verified",
+    "native_recomputed_now",
+    "source_execution_performed",
+    "native_scpi_replay_performed"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
