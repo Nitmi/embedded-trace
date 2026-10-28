@@ -1,4 +1,5 @@
 * text=auto eol=lf
+examples/thermal/fixtures.zip -text -diff
 *.jsonl text eol=lf
 examples/waveform/** -text -diff
 examples/waveform/README.md text eol=lf diff

@@ -152,6 +152,12 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
             "embedded_trace/load_protocol.py",
             "embedded_trace/schemas/load-report.schema.json",
         }
+    if tuple(map(int, version.split("."))) >= (0, 12, 0):
+        runtime_files |= {
+            "embedded_trace/thermal.py",
+            "embedded_trace/thermal_protocol.py",
+            "embedded_trace/schemas/thermal-report.schema.json",
+        }
     require(set(wheel) == runtime_files | expected_metadata, "Unexpected/missing wheel files")
     metadata = email.parser.BytesParser().parsebytes(wheel[prefix + "METADATA"])
     require(

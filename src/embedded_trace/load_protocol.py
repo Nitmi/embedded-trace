@@ -328,7 +328,7 @@ def validate_report(report, contract, blobs, raw):
     )
     require(
         report["schema_version"] == "lab-instruments.load-check-report.v1"
-        and report["runner_version"] == "0.10.0"
+        and report["runner_version"] in ("0.10.0", "0.11.0")
         and report["complete"] is True
         and report["scope"] == "host_only_saved_load_evaluation",
         "unsupported native load report",
@@ -572,7 +572,7 @@ def validate_report(report, contract, blobs, raw):
 
 
 def project(manifest_blob, blobs, version):
-    require(version == "0.11.0", "unsupported HIL load producer")
+    require(version in ("0.11.0", "0.12.0"), "unsupported HIL load producer")
     manifest = decode(unpack(manifest_blob, MAX_MANIFEST))
     validate_manifest(manifest)
     fields(blobs, LIMITS)
@@ -609,6 +609,11 @@ def project(manifest_blob, blobs, version):
     same(manifest["native_exit_code"], 0 if report["ok"] else 3)
     fields(response["data"], ("verification", "junit", "output"))
     verified = response["data"]["verification"]
+    verifier = verified.get("verifier_version")
+    require(
+        verifier == "0.11.0" or verifier == "0.10.0" and report["runner_version"] == "0.10.0",
+        "unsupported native load producer/verifier pair",
+    )
     bindings = {}
     for role in ("spec", "capture"):
         supplied = reference(verified["bindings"][role]["supplied"], blobs[role])
@@ -626,8 +631,8 @@ def project(manifest_blob, blobs, version):
             complete=True,
             report=reference(verified["report"], blobs["report"]),
             bindings=bindings,
-            producer_runner_version="0.10.0",
-            verifier_version="0.10.0",
+            producer_runner_version=report["runner_version"],
+            verifier_version=verifier,
             verdict={k: report[k] for k in ("ok", "status", "summary")},
             scope="host_only_saved_load_verification",
             **NATIVE_FLAGS,

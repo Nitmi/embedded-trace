@@ -3,6 +3,50 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.12 on feat/offline-thermal-evidence adds independent thermal
+inspect/query/report. Published0.11 is029233a8; older local/unpublished wording
+below is historical. Read docs/thermal.md. The stdlib thermal_protocol.py and
+load_protocol.py stay byte-identical with HIL, without either runtime importing
+the other or lab. No native temperature conversion, JUnit reconstruction, camera,
+helper, network or executable access belongs in this view.
+
+- Validate the whole embedded source inventory and recorded native/HIL projection
+  before any check/status/page filter. Passing-only and empty pages retain full
+  global failed verdict/JUnit counts, unknown cleanup and source error context.
+  Keep raw frame/control/telemetry/ROI/mask/trend evidence and false measurement,
+  calibration, identity, scene, physical clock and junction-temperature claims.
+- Native verification and HIL XML checking are recorded historical/unsigned data.
+  native_recomputed_now/native_temperature_conversion_performed and
+  hil_import_checks_reperformed remain false. Hashes authenticate no execution.
+  Thermal stays outside the host-time timeline. Maxima can move between pixels;
+  no tracked-point heating rate, UTC alignment or causality is inferred.
+- Native mean consistency permits one adjacent binary float around recorded
+  min/max because fsum/division can round there. Exact user bounds/comparisons
+  remain unchanged. Keep whole report checks and tamper rejection intact.
+- Python3.11/3.13 full470 passed/two platform skips each; final bare-pytest thermal/
+  release focused71 passed each. Independent cold install138 CLI/24 package files
+  each. Joint actual wheels processed26 cases each, including current lab0.11
+  native digital/load, unchanged legacy producer0.8, all11 thermal cases, and a
+  current SDS waveform many-file case. No physical device/SDK/simulator accessed.
+- First Trace3.11 cold smoke was interrupted by its outer600s watchdog in an old
+  digital report step. Exact host cause remains unconfirmed. The same installed
+  step succeeded once in0.357s, and a unique new isolated full cold run passed.
+  Retain the failed directory and original stderr; never count it as passed or
+  weaken product timeouts. A joint wrapper also confused digital selected_count
+  with thermal/load selected_checks. Keep actual recorded argv/exit/hash when
+  reusing completed offline operations after a wrapper-only correction.
+- InstalledPy3.13 warm medians:3-frame/two-check2.17MB bundle, full passing/empty
+  views43.35/44.22ms;8-frame/eight-check5.72MB,103.20/103.55ms. Python allocation
+  peak33.56MB comes from bounded read(maximum+1), not just selected rows. No RSS,
+  process startup, cold-I/O, worst-case or SLA claim. Network/process starts were
+  blocked. Bundle32MiB/depth32, original sources16MiB/101files; Markdown1MiB with
+  8192-character inert previews plus full untruncated global counts.
+- Keep thermal.py/thermal_protocol.py/schema in exact release and installed
+  inventories (24 package files,17 modules/seven schemas). fixtures.zip contains
+  eleven native synthetic bundles, not private or physical camera evidence;
+  preserve its raw bytes with -text. Evidence:
+  D:\Code\tmp\hil-trace-thermal-0120-20261028.
+
 Release CI found that tests/test_load.py imported scripts as a package, relying
 on `python -m pytest` putting the checkout on sys.path. The CI `pytest` launcher
 does not guarantee this. Reuse test_release's explicit file-loaded release

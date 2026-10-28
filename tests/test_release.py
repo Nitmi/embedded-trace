@@ -40,6 +40,10 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, ver
     """Independent minimal distribution fixture; contents are never imported."""
     metadata = f"embedded_trace-{version}.dist-info/"
     wheel = {"embedded_trace/" + name: b"# synthetic module\n" for name in MODULES}
+    if tuple(map(int, version.split("."))) >= (0, 12, 0):
+        wheel["embedded_trace/thermal.py"] = b"# synthetic thermal\n"
+        wheel["embedded_trace/thermal_protocol.py"] = b"# synthetic thermal protocol\n"
+        wheel["embedded_trace/schemas/thermal-report.schema.json"] = b"{}\n"
     if tuple(map(int, version.split("."))) >= (0, 11, 0):
         wheel["embedded_trace/load.py"] = b"# synthetic load\n"
         wheel["embedded_trace/load_protocol.py"] = b"# synthetic load protocol\n"

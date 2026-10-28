@@ -6,7 +6,10 @@
       "const": "embedded-hil-runner.load-report.v1"
     },
     "producer_version": {
-      "const": "0.11.0"
+      "enum": [
+        "0.11.0",
+        "0.12.0"
+      ]
     },
     "scope": {
       "const": "host_only_saved_load_import"

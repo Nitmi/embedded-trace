@@ -1,6 +1,10 @@
 # Embedded Trace
 
-Local **0.11.0** adds [saved load evidence views](docs/load.md): inspect,
+Local **0.12.0** adds [saved thermal views](docs/thermal.md): inspect, filter and
+report ROI checks while retaining all original bytes, global failed verdicts,
+invalid evidence and unverified temperature/identity/clock claims.
+
+Version **0.11.0** adds [saved load evidence views](docs/load.md): inspect,
 filter and report SDL1020X-E assertions with original V/I/P query bytes,
 complete verdicts and failed/unknown cleanup. Actual lab 0.10 digital/waveform
 reports are also accepted without changing their evidence formats.

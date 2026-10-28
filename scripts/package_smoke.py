@@ -194,6 +194,9 @@ def main() -> None:
     )
     assert error["error"]["code"] == "HASH_MISMATCH" and not drift.exists()
     assert verify_instruments(run, cli, root)
+    from thermal_smoke import verify as verify_thermal
+
+    assert verify_thermal(run, cli, root)
     package = Path(identity["path"]).parent
     verified = 0
     with zipfile.ZipFile(wheel) as archive:
@@ -201,7 +204,7 @@ def main() -> None:
             if item.filename.startswith("embedded_trace/") and not item.is_dir():
                 assert (package.parent / item.filename).read_bytes() == archive.read(item)
                 verified += 1
-    assert verified == 21  # Fifteen modules and six schemas; no runtime dependency.
+    assert verified == 24  # Seventeen modules and seven schemas; no runtime dependency.
     for value in (correlated, inspected, found, overlapped, rendered):
         assert value["hardware_access"] is False and value["executables_started"] is False
         assert value["cross_source_clock_alignment_verified"] is False
