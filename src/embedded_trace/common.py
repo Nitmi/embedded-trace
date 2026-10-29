@@ -117,8 +117,24 @@ def read_file(path: Path, maximum: int, expected: str | None = None) -> tuple[by
     path = checked_path(path)
     require(stat.S_ISREG(path.stat().st_mode), "input must be a regular file")
     with path.open("rb") as stream:
-        require(stat.S_ISREG(os.fstat(stream.fileno()).st_mode), "input is not a regular file")
-        raw = stream.read(maximum + 1)
+        opened = os.fstat(stream.fileno())
+        require(stat.S_ISREG(opened.st_mode), "input is not a regular file")
+        limit = maximum + 1
+        # Use size only to avoid allocating the whole limit for a small file.
+        # Probe beyond it: the opened file may have grown or returned a short read.
+        raw = stream.read(min(limit, opened.st_size + 1))
+        if len(raw) < limit:
+            tail = stream.read(1)
+            if tail:
+                chunks = [raw, tail]
+                size = len(raw) + len(tail)
+                while size < limit:
+                    chunk = stream.read(min(65536, limit - size))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    size += len(chunk)
+                raw = b"".join(chunks)
     require(len(raw) <= maximum, "input exceeds byte limit", "LIMIT_EXCEEDED")
     actual = digest(raw)
     if expected is not None:

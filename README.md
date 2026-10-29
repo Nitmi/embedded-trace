@@ -1,5 +1,9 @@
 # Embedded Trace
 
+Local **0.13.1** reduces temporary allocations for small evidence files while
+retaining complete size and SHA-256 checks. See [performance notes](docs/performance.md)
+for the measured costs, bounds and file-growth behavior.
+
 Local **0.13.0** adds [sensor evidence views](docs/simulation.md#sensor-evidence)
 for fixed sim-runner 0.8.0 nRF52840 TWI0/TMP103 reports. Filtered and empty pages
 retain native signed samples, fault outcomes, raw model observation spans and

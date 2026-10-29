@@ -3,6 +3,35 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local 0.13.1 on fix/bounded-read-allocation reduces temporary read
+allocation. The 0.13.0 source below is historical and already published.
+
+- Opened-file size is an allocation hint only. An EOF probe and bounded chunks
+  handle growth/short reads without truncation, preserve the limit+1 check and
+  hash all accepted bytes. Stable input storage scales with actual size; growth
+  fallback can temporarily retain roughly twice the bytes plus chunk overhead.
+  Query still validates the complete document before selecting any page.
+- Both Python 3.11/3.13: 537 passed, two existing platform skips; Ruff and format
+  pass. Each independent installed-wheel smoke passes 138 CLI checks and verifies
+  24 package payload files. Forty-three added cases cover exact/empty/overflow,
+  stale size hints, short reads, multi-chunk growth, tail hashes and allocations.
+- Reader-only before/after comparisons preserve all 16 result hashes per Python,
+  including frozen/timeout and empty views, under network/process/write/source
+  reopening guards. Warm CPython3.13 normal inspect: 12.12 -> 3.83 ms and
+  67,118,275 -> 287,730 Python peak bytes; 1 KiB read: 67,118,235 -> 11,095 B.
+  These are local in-process observations, not RSS/startup/cold IO or an SLA.
+  See docs/performance.md and D:\Code\tmp\trace-read-allocation-20261029.
+- Development pitfalls: Windows default text encoding is GBK; read UTF-8 control
+  JSON explicitly. Helpers save captured stdout only after subprocess completion.
+  Source tests must explicitly select src: the reusable dev environments also
+  contain older installed wheels. The initial red allocation check used that
+  old wheel; the separate two-Python source baselines establish the exact before.
+  Keep isolated source imports explicit and retain the original command logs.
+- This is a local, unsigned/unpublished patch candidate. No hardware, emulator,
+  native capture, Toolkit/plugin/station/lock/PATH or public resource changes.
+  The user separately reported actual Toolkit0.36 loading/static acceptance
+  passed; do not rerun those checks or interpret them as physical verification.
+
 Current local0.13 on feat/sensor-simulation-evidence adds native sensor views;
 0.12 below is historical and already published. Read docs/simulation.md#sensor-evidence.
 
