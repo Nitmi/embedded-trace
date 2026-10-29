@@ -3,6 +3,42 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.13 on feat/sensor-simulation-evidence adds native sensor views;
+0.12 below is historical and already published. Read docs/simulation.md#sensor-evidence.
+
+- Explicitly bind0.8 sensor schema/profile, fixed native plan/script/fault/clock,
+  then preserve complete bounded assertions, failures, unknown effect/nulls and
+  four raw stdout spans. Raw offsets/length/hash come from native metadata;
+  import checks exact records including final newline and signed negative values.
+  Views use only the self-contained timeline. No temperature/readiness policy is
+  replayed, and recorded failed values are retained rather than reclassified.
+- Coverage/physical timing/accuracy/I2C electrical flags remain false. Requested
+  RunFor boundaries, guest250kHz TIMER0 IRQ captures and whole host UART windows
+  stay distinct. Empty/sample queries retain all source context and failed verdicts.
+  Shared load/thermal protocol bytes match HIL; explicit producer lists/schemas
+  accept0.13 without removing older versions. Runtime stays independent stdlib.
+- Py3.11/3.13 each494 passed/two platform skips; bare-pytest sensor/release66 passed
+  each. Both independent cold smokes138 CLI/24 package files; joint installed
+  pairs each65 matching non-RECORD payload files. Seven suites per Python cover
+  eighteen actual native attempts total with zero retries, mixed old profiles,
+  fail-stop/null timeout and preflight rejection. Fourteen sensor sources retain
+  forty-eight exact raw spans; all views and rehashed summary tamper checks pass.
+- Development wrapper errors involved -I excluding the neighboring smoke helper,
+  duplicate HIL/Trace inspect capture names, capture_outcomes mapping and absent
+  timeout uart.bin. Preserve failed wrapper records; reuse recorded matching argv,
+  actual exit and completed capture after correction. No native run was retried.
+- InstalledPy3.13 warm one+seven: normal two-source import30.04ms, inspect19.28ms,
+  sample18.51ms/empty19.89ms; frozen import18.86ms/views~17-18ms, timeout import
+  16.78ms/views~16-18ms. Python peaks~8.7MB import/~67.1MB views; existing bounded
+  read(limit+1) temporarily allocates the64MiB document limit even for tiny files.
+  This is measured cost, not RSS/startup/cold-I/O/SLA. Optimize the common reader
+  separately with boundary tests if needed; never skip full verification for a page.
+  Audit hooks blocked network/process starts and original-file view reopening.
+- Evidence D:\Code\tmp\hil-trace-sensor-0130-20261029;304 protected files unchanged.
+  No real sensor/board access or formal Toolkit/station/plugin/lock update. Local
+  candidate0.13 is unsigned/unpublished; next prepare three-component release and
+  formal Toolkit integration, without marking local artifacts published.
+
 Current local0.12 on feat/offline-thermal-evidence adds independent thermal
 inspect/query/report. Published0.11 is029233a8; older local/unpublished wording
 below is historical. Read docs/thermal.md. The stdlib thermal_protocol.py and

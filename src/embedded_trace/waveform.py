@@ -93,7 +93,7 @@ def load(path, sha):
     )
     require(
         bundle["schema_version"] == "embedded-hil-runner.waveform-report.v1"
-        and bundle["producer_version"] in ("0.10.0", "0.11.0", "0.12.0")
+        and bundle["producer_version"] in ("0.10.0", "0.11.0", "0.12.0", "0.13.0")
         and bundle["scope"] == "host_only_saved_waveform_import"
         and bundle["native_recomputation_recorded"] is True
         and bundle["validation_kind"]

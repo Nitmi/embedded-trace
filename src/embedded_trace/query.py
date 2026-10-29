@@ -33,12 +33,16 @@ from .simulation import (
     OUTCOMES,
     S3_FIELDS,
     S3_PROFILE,
+    SENSOR_FIELDS,
+    SENSOR_PROFILE,
     WASM_FIELDS,
     WASM_PROFILE,
     gpio_summary,
     model_limits,
     s3_summary,
+    sensor_summary,
     validate_gpio_spans,
+    validate_sensor_spans,
     wasm_summary,
 )
 from .timeline import ORDERING, SAFETY
@@ -475,6 +479,17 @@ def validate(document: dict) -> None:
                     "GPIO summary/coverage/clock semantics changed",
                 )
                 validate_gpio_spans(source)
+            if source["profile"] == SENSOR_PROFILE:
+                expected = sensor_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and json.dumps(source.get("virtual_time"), sort_keys=True)
+                    == json.dumps(report.get("virtual_time"), sort_keys=True)
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "sensor declarations/clock/qualification changed",
+                )
+                validate_sensor_spans(source)
             require(
                 isinstance(report.get("artifacts"), dict)
                 and set(report["artifacts"]) == set(source["evidence_inputs"])
@@ -555,6 +570,7 @@ def simulation_sources(document: dict) -> dict:
         *GPIO_FIELDS,
         *FAULT_FIELDS,
         *S3_FIELDS,
+        *SENSOR_FIELDS,
         *WASM_FIELDS,
     )
     return {

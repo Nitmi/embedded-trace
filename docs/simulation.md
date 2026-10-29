@@ -165,3 +165,31 @@ native metadata saved inside the timeline. Query/report still work after the
 source directory is removed. Flash diagnostics, qualified/failed outcomes and
 false coverage/security claims remain unchanged; complete SMP, debug attachment,
 Flash commands or physical behavior cannot be inferred from this view.
+
+## Sensor evidence
+
+Trace 0.13 accepts native `embedded-sim-runner.sensor-report.v1` for the fixed
+0.8.0 `nrf52840-i2c-sensor-v1` profile. It binds the saved plan, script, clock,
+fault request and nine-file Renode artifact layout before constructing a view.
+The 8 MiB source budget is unchanged. It never opens the original runtime paths.
+
+`sensor_evidence` preserves all native assertions, up to 16 guest samples and
+four paused TMP103/TWI0/TIMER0 observations. Signed negative temperature bytes
+remain distinct from unsigned register values. Fault effects, nominal failures,
+native errors and unevaluated null assertions are retained without rerunning
+firmware or sensor acceptance policy. A successful import is no simulation pass.
+
+Each observation uses the native stdout offset/length/hash to save exact raw
+`sensor_observation_spans`. Import checks those bytes and the recorded values;
+later views validate the embedded spans and metadata without reopening sources.
+Saved consistency is neither authenticity nor independent model execution.
+All sensor fields, spans and failed/unknown outcomes survive UART filters and
+empty pages. Markdown keeps source context outside truncated event previews.
+
+The coverage, physical timing, sensor accuracy and I2C electrical verification
+flags stay false. Observation times are requested paused RunFor boundaries;
+sample ticks are guest 250 kHz TIMER0 IRQ captures. UART events still use the
+entire recorded host run window. No calibrated/electrical/physical measurement,
+clock synchronization or real board acceptance follows from these declarations.
+Whole timeline validation precedes filters; an empty page has the same input
+verification cost. Sixteen samples/four spans bound the added projection cost.

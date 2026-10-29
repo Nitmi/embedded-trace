@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.13.0** adds [sensor evidence views](docs/simulation.md#sensor-evidence)
+for fixed sim-runner 0.8.0 nRF52840 TWI0/TMP103 reports. Filtered and empty pages
+retain native signed samples, fault outcomes, raw model observation spans and
+unverified accuracy/electrical/timing claims.
+
 Local **0.12.0** adds [saved thermal views](docs/thermal.md): inspect, filter and
 report ROI checks while retaining all original bytes, global failed verdicts,
 invalid evidence and unverified temperature/identity/clock claims.

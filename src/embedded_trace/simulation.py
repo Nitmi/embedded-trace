@@ -24,6 +24,24 @@ from .common import (
 from .framing import Framer
 
 FORMAT = "sim-runner-report"
+SENSOR_PROFILE = "nrf52840-i2c-sensor-v1"
+SENSOR_LABELS = {
+    "model_coverage_complete": False,
+    "physical_timing_verified": False,
+    "sensor_accuracy_verified": False,
+    "i2c_electrical_behavior_verified": False,
+    "sensor_observation_semantics": "paused_model_property_and_register_snapshot_not_measurement",
+    "sensor_sample_semantics": "guest_TWI0_register0_signed_byte_not_calibrated_temperature",
+    "timer_observation_semantics": "guest_250kHz_TIMER0_IRQ_capture_not_host_time",
+}
+SENSOR_FIELDS = (
+    *SENSOR_LABELS,
+    "fault_scenario",
+    "fault_request",
+    "sensor_evidence",
+    "sensor_observation_spans",
+    "native_errors",
+)
 WASM_PROFILE = "esp32c3-wasm-flash-v1"
 WASM_COMPONENTS = {
     "component/" + n for n in ("esp_emu.js", "esp_emu_bg.wasm", "package.json", "LICENSE")
@@ -521,11 +539,203 @@ def validate_gpio_spans(source: dict) -> None:
         cursor = end
 
 
+def sensor_summary(report: dict) -> dict:
+    """Validate recorded structure, not the firmware's signed-temperature regression policy."""
+    require(
+        report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
+        and report.get("profile") == SENSOR_PROFILE
+        and all(
+            type(report.get(k)) is type(v) and report[k] == v for k, v in SENSOR_LABELS.items()
+        ),
+        "invalid sensor identity/qualification",
+    )
+    fault = report.get("fault_scenario")
+    require(
+        type(fault) is str and fault in ("none", "temperature-stuck", "temperature-offset"),
+        "invalid sensor fault",
+    )
+    clock = report.get("virtual_time")
+    require(
+        isinstance(clock, dict)
+        and set(clock) == {"domain", "requested_ms", "completed"}
+        and clock["domain"] == "renode_emulation"
+        and type(clock["requested_ms"]) is int
+        and clock["requested_ms"] == 82
+        and type(clock["completed"]) is bool,
+        "invalid sensor clock",
+    )
+    evidence = report.get("assertions")
+    require(evidence is None or isinstance(evidence, dict), "invalid sensor evidence")
+    require(not report["ok"] or isinstance(evidence, dict), "passing sensor lacks evidence")
+    if evidence is not None:
+        require(
+            type(evidence.get("nominal_regression_passed")) is bool,
+            "invalid sensor nominal verdict",
+        )
+        failure = evidence.get("nominal_failure")
+        require(failure is None or isinstance(failure, str), "invalid sensor failure")
+        if failure is not None:
+            text(failure, "sensor failure", 2048)
+        effect = evidence.get("fault")
+        require(
+            isinstance(effect, dict)
+            and set(effect) == {"id", "effect_observed", "status"}
+            and effect["id"] == fault
+            and (effect["effect_observed"] is None or type(effect["effect_observed"]) is bool)
+            and effect["status"] in ("not_evaluated", "not_requested", "observed", "not_observed"),
+            "invalid sensor effect",
+        )
+        for key in ("ready_matches", "build_matches", "model_nominal", "sample_summary_truncated"):
+            if key in evidence:
+                require(type(evidence[key]) is bool, "invalid sensor boolean")
+        if "sample_lines_seen" in evidence:
+            integer(evidence["sample_lines_seen"], "sensor line count", 0, MAX_SOURCE_BYTES)
+        require(
+            evidence.get("fault_scenario") == fault
+            and all(
+                type(evidence.get(k)) is type(v) and evidence[k] == v
+                for k, v in SENSOR_LABELS.items()
+            ),
+            "sensor assertion context differs",
+        )
+        samples = evidence.get("samples")
+        require(isinstance(samples, list) and len(samples) <= 16, "invalid sensor samples")
+        for row in samples:
+            require(
+                isinstance(row, dict)
+                and set(row)
+                == {"sequence", "raw_byte", "celsius", "timer_ticks", "irq_vector", "error"},
+                "invalid sensor sample fields",
+            )
+            for field in ("sequence", "timer_ticks", "irq_vector", "error"):
+                integer(row[field], field, 0, 2**32 - 1)
+            integer(row["raw_byte"], "sensor raw byte", 0, 255)
+            integer(row["celsius"], "sensor signed value", -(2**31), 2**31 - 1)
+        observations = evidence.get("model_observations")
+        require(
+            isinstance(observations, list) and len(observations) in (0, 4),
+            "invalid sensor observation inventory",
+        )
+        for index, row in enumerate(observations):
+            require(
+                isinstance(row, dict)
+                and set(row)
+                == {
+                    "phase",
+                    "requested_virtual_ms",
+                    "temperature_celsius",
+                    "i2c_address",
+                    "timer_counter",
+                    "stdout_offset",
+                    "stdout_bytes",
+                    "stdout_sha256",
+                },
+                "invalid sensor observation fields",
+            )
+            require(
+                integer(row["phase"], "sensor phase", 0, 3) == index
+                and integer(row["requested_virtual_ms"], "sensor boundary", 20, 80)
+                == 20 + 20 * index,
+                "sensor observation order/boundary differs",
+            )
+            integer(row["temperature_celsius"], "sensor property", -128, 127)
+            integer(row["i2c_address"], "sensor address", 0, 127)
+            integer(row["timer_counter"], "sensor counter", 0, 2**32 - 1)
+            integer(row["stdout_offset"], "sensor stdout offset", 0, MAX_SOURCE_BYTES)
+            integer(row["stdout_bytes"], "sensor stdout bytes", 1, 128)
+            require(
+                re.fullmatch(r"[0-9a-f]{64}", text(row["stdout_sha256"], "sensor span hash", 64))
+                is not None,
+                "invalid sensor span hash",
+            )
+    errors = report.get("errors")
+    require(isinstance(errors, list) and len(errors) <= 16, "invalid sensor errors")
+    for error in errors:
+        require(
+            isinstance(error, dict) and set(error) == {"code", "message"}, "invalid sensor error"
+        )
+        text(error["code"], "sensor error code", 128)
+        text(error["message"], "sensor error", 2048)
+    return {
+        **SENSOR_LABELS,
+        "fault_scenario": fault,
+        "fault_request": {"id": fault, "requested_virtual_ms": None if fault == "none" else 22},
+        "sensor_evidence": copy.deepcopy(evidence),
+        "native_errors": copy.deepcopy(errors),
+    }
+
+
+def validate_sensor_spans(source):
+    """Check saved byte-span layout; never reopen an original source or rerun policy."""
+    evidence = source["sensor_evidence"]
+    rows = [] if evidence is None else evidence["model_observations"]
+    spans = source.get("sensor_observation_spans")
+    require(isinstance(spans, list) and len(spans) == len(rows), "invalid sensor spans")
+    cursor = 0
+    for span, row in zip(spans, rows, strict=True):
+        require(
+            isinstance(span, dict)
+            and set(span) == {"phase", "byte_start", "byte_end", "raw_base64", "sha256"}
+            and type(span["phase"]) is int
+            and span["phase"] == row["phase"],
+            "invalid sensor span fields",
+        )
+        ref = source["evidence_inputs"].get("backend.stdout.bin")
+        require(isinstance(ref, dict), "sensor stdout reference missing")
+        start = integer(span["byte_start"], "sensor span start", cursor, ref["size_bytes"])
+        end = integer(span["byte_end"], "sensor span end", start + 1, ref["size_bytes"])
+        require(end - start <= 128, "sensor span exceeds budget")
+        raw = decode_base64(span["raw_base64"])
+        pattern = (
+            rb"SIM_SENSOR_OBS_"
+            + str(row["phase"]).encode()
+            + rb"\r?\n(-?[0-9]{1,3})\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n"
+        )
+        match = re.fullmatch(pattern, raw)
+        require(
+            match is not None
+            and len(raw) == end - start == row["stdout_bytes"]
+            and start == row["stdout_offset"]
+            and digest(raw) == span["sha256"] == row["stdout_sha256"]
+            and [int(v) for v in match.groups()]
+            == [row[k] for k in ("temperature_celsius", "i2c_address", "timer_counter")],
+            "sensor span differs from recorded observation",
+        )
+        cursor = end
+
+
+def sensor_spans(summary, stdout):
+    evidence = summary["sensor_evidence"]
+    rows = [] if evidence is None else evidence["model_observations"]
+    spans = []
+    for row in rows:
+        start, size = row["stdout_offset"], row["stdout_bytes"]
+        raw = stdout[start : start + size]
+        spans.append(
+            dict(
+                phase=row["phase"],
+                byte_start=start,
+                byte_end=start + size,
+                raw_base64=base64.b64encode(raw).decode("ascii"),
+                sha256=digest(raw),
+            )
+        )
+    validate_sensor_spans(
+        {
+            **summary,
+            "sensor_observation_spans": spans,
+            "evidence_inputs": {"backend.stdout.bin": {"size_bytes": len(stdout)}},
+        }
+    )
+    return spans
+
+
 def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> int:
     require(
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    sensor = report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
     wasm = report.get("schema_version") == "embedded-sim-runner.esp-wasm-report.v1"
     fault = report.get("schema_version") == "embedded-sim-runner.gpio-fault-report.v1"
     gpio = fault or report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
@@ -534,6 +744,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
         wasm
+        or sensor
         or gpio
         or flash
         or qemu
@@ -546,7 +757,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        WASM_PROFILE
+        SENSOR_PROFILE
+        if sensor
+        else WASM_PROFILE
         if wasm
         else FAULT_PROFILE
         if fault
@@ -648,7 +861,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.esp-wasm-plan.v1"
+            "embedded-sim-runner.sensor-plan.v1"
+            if sensor
+            else "embedded-sim-runner.esp-wasm-plan.v1"
             if wasm
             else "embedded-sim-runner.gpio-fault-plan.v1"
             if fault
@@ -671,6 +886,23 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         )
     if wasm:
         wasm_binding(report, plan, loaded, source)
+    if sensor:
+        summary = sensor_summary(report)
+        require(
+            all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in SENSOR_LABELS.items())
+            and plan.get("fault_scenario") == summary["fault_scenario"]
+            and plan.get("scenario", {}).get("fault") == summary["fault_request"]
+            and plan.get("backend") == "renode"
+            and type(plan.get("virtual_ms")) is int
+            and plan["virtual_ms"] == 82
+            and digest(loaded["run.resc"]) == plan.get("script_sha256"),
+            "sensor plan request/context/script differs",
+        )
+        source.update(summary)
+        source["sensor_observation_spans"] = sensor_spans(
+            summary, loaded.get("backend.stdout.bin", b"")
+        )
+        source["warnings"]["model_coverage_incomplete"] = 1
     if gpio:
         summary = gpio_summary(report)
         require(

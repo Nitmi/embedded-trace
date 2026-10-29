@@ -6,7 +6,7 @@
       "const": "embedded-hil-runner.thermal-report.v1"
     },
     "producer_version": {
-      "const": "0.12.0"
+      "enum": ["0.12.0", "0.13.0"]
     },
     "scope": {
       "const": "host_only_saved_thermal_import"
