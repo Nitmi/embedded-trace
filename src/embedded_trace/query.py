@@ -34,7 +34,8 @@ from .simulation import (
     S3_FIELDS,
     S3_PROFILE,
     SENSOR_FIELDS,
-    SENSOR_PROFILE,
+    SENSOR_PROFILES,
+    SPI_FIELDS,
     WASM_FIELDS,
     WASM_PROFILE,
     gpio_summary,
@@ -479,7 +480,7 @@ def validate(document: dict) -> None:
                     "GPIO summary/coverage/clock semantics changed",
                 )
                 validate_gpio_spans(source)
-            if source["profile"] == SENSOR_PROFILE:
+            if source["profile"] in SENSOR_PROFILES:
                 expected = sensor_summary(report)
                 require(
                     json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
@@ -571,6 +572,7 @@ def simulation_sources(document: dict) -> dict:
         *FAULT_FIELDS,
         *S3_FIELDS,
         *SENSOR_FIELDS,
+        *SPI_FIELDS,
         *WASM_FIELDS,
     )
     return {

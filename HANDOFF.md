@@ -3,6 +3,43 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.14 on feat/spi-simulation-evidence adds explicit SPI evidence.
+The0.13.1 reader patch below is historical and already published.
+Read docs/simulation.md#spi-evidence-in-local-0140 before changing this path.
+
+- Bind sim-runner0.9 schema/profile, plan/script/fault/clock and preserve native
+  raw16-bit words/signed Q4, errors, unknown/null effects and four model spans.
+  The separate spi_frame_slip_span binds the exact returned byte and ordering;
+  decimal-to-Q4 comparison checks saved representation, not sensor calibration
+  or native regression policy. Keep old I2C fields and producer versions intact.
+- Every view validates complete input before filtering; full/sample/empty and
+  Markdown retain global failures/coverage, and reopen only the saved timeline.
+  The frame-slip monitor consumes one model byte, not an electrical fault.
+  Physical timing/accuracy/SPI electrical and complete model coverage stay false.
+- Python3.11/3.13 each564 passed/two existing platform skips; Ruff/format/lock/
+  diff checks pass. Added27 cases cover signed data, raw spans/slip/nulls, old
+  inputs and contradictions. Each cold smoke138 CLI checks/24 package files;
+  joint installed pairs verify65 non-RECORD payloads across both components.
+- Each of two matrices7 suites/72 CLI/9 actual native simulations, zero retries.
+  Normal/mixed pass; frozen/slip/wrong BUILD/timeout fail-stop and preflight
+  rejection preserve native outcomes.14 SPI sources/48 model spans/2 slip spans
+  independently audited. Four normal UARTs equal the accepted sim0.9 fixture.
+  Current HIL0.14 producer -> Trace0.14 saved instrument checks16 cases. Shared
+  load/thermal kernels match HIL byte-for-byte. No hardware or lab SDK runs.
+- InstalledPy3.13 warm one+seven: normal two-source import7.46ms/387211 peakB;
+  inspect4.03ms/292667B, samples4.10ms/292714B, empty3.86ms/292507B.
+  Frozen inspect2.11ms/151199B; timeout0.56ms/43198B. Not RSS/startup/cold IO/SLA.
+  Network/process and original-source view reopening guards are enabled.
+- Pitfalls: explicit source imports are needed in reused dev environments;
+  installed checks use independent -I prefixes and exact wheel-byte verification.
+  Compatibility helper used the wrong HIL identity key and nonexistent cleanup
+  fixture; corrected to producer_version and cleanup-unknown. Original errors
+  retained and only matching completed argv/exit/raw hashes reused, no native
+  attempt repeated. Evidence root D:\Code\tmp\hil-trace-spi-0140-20261030.
+- 273 protected files unchanged; Toolkit0.36.1/plugin/station/locks/PATH untouched.
+  Local unsigned/unpublished candidates only. Next prepare the three-component
+  release and Toolkit integration, without replaying completed native matrices.
+
 Current local 0.13.1 on fix/bounded-read-allocation reduces temporary read
 allocation. The 0.13.0 source below is historical and already published.
 

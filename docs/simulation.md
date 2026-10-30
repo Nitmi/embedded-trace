@@ -1,5 +1,36 @@
 # Offline simulation evidence
 
+## SPI evidence in local 0.14.0
+
+Trace accepts the explicit sim-runner 0.9.0
+`embedded-sim-runner.spi-sensor-report.v1` / `nrf52840-spi-sensor-v1` pair.
+It binds the saved plan/script/fault/clock, preserves bounded `sensor_evidence`
+with raw 16-bit words and signed Q4 values (1/16 °C), native failures, unknown
+effects and all four independent model observation byte spans. There is no
+simulator import, executable launch or re-execution of native regression policy.
+
+`spi_frame_slip_span` separately preserves the exact `SIM_SPI_SLIP` marker and
+discarded byte. Its hash, offset, length, newline, returned byte and ordering
+between model snapshots must match the recorded native observation. The four
+model spans also retain the exact decimal-to-Q4 representation; bools, overflow,
+partial records and coherently rehashed contradictory bytes are rejected.
+There is no sensor conversion or recalibration: decimal parsing checks only
+that the saved model-property bytes agree with the recorded integer Q4 field.
+
+Inspect, sample/empty queries and Markdown preserve every source's native
+failure and qualification even when no line is selected. These views use only
+the self-contained timeline and do not reopen original sources. A successful
+import/query does not make the captured simulation pass. Hashes provide local
+integrity/consistency, not evidence authenticity or execution attestation.
+
+SPI electrical behavior, sensor accuracy, physical timing and complete model
+coverage remain false. The frame-slip operation consumes one byte in the model;
+it is not an electrical fault or proof of a physical chip-select driver. Host
+UART windows, requested virtual boundaries and guest TIMER0 captures remain
+distinct. Existing I2C/GPIO/UART/QEMU/WASM evidence and saved instrument domains
+retain their versioned structure. HIL 0.14 producer versions are accepted
+explicitly without removing older producer pairs.
+
 ## Experimental ESP-EMU WASM in 0.8.0
 
 Embedded Trace 0.8.0 accepts `embedded-sim-runner.esp-wasm-report.v1`

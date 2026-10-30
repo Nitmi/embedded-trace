@@ -17,7 +17,9 @@ from .simulation import (
     S3_FIELDS,
     S3_PROFILE,
     SENSOR_FIELDS,
-    SENSOR_PROFILE,
+    SENSOR_PROFILES,
+    SPI_FIELDS,
+    SPI_PROFILE,
     WASM_FIELDS,
     WASM_PROFILE,
 )
@@ -147,8 +149,13 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                     else {}
                 ),
                 **(
-                    {key: source[key] for key in SENSOR_FIELDS}
-                    if source.get("profile") == SENSOR_PROFILE
+                    {
+                        key: source[key]
+                        for key in (
+                            SPI_FIELDS if source.get("profile") == SPI_PROFILE else SENSOR_FIELDS
+                        )
+                    }
+                    if source.get("profile") in SENSOR_PROFILES
                     else {}
                 ),
                 **(

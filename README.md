@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.14.0** adds [SPI/LM74 saved evidence](docs/simulation.md#spi-evidence-in-local-0140):
+signed fractional values, model snapshots and a separate byte-frame-slip span,
+with failures and unknown effects retained in full, filtered and empty views.
+The runtime remains offline and standard-library-only.
+
 Local **0.13.1** reduces temporary allocations for small evidence files while
 retaining complete size and SHA-256 checks. See [performance notes](docs/performance.md)
 for the measured costs, bounds and file-growth behavior.

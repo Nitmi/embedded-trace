@@ -131,7 +131,8 @@ def load(path, sha):
     )
     require(
         bundle["schema_version"] == "embedded-hil-runner.instrument-report.v1"
-        and bundle["producer_version"] in ("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0")
+        and bundle["producer_version"]
+        in ("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0")
         and bundle["scope"] == "host_only_saved_instrument_import"
         and bundle["native_recomputation_recorded"] is True
         and bundle["validation_kind"] == "recorded_native_verification_and_explicit_input_integrity"

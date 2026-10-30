@@ -6,6 +6,7 @@ import base64
 import copy
 import json
 import re
+from decimal import Decimal
 from pathlib import Path
 
 from .adapters import decode_base64
@@ -25,6 +26,8 @@ from .framing import Framer
 
 FORMAT = "sim-runner-report"
 SENSOR_PROFILE = "nrf52840-i2c-sensor-v1"
+SPI_PROFILE = "nrf52840-spi-sensor-v1"
+SENSOR_PROFILES = (SENSOR_PROFILE, SPI_PROFILE)
 SENSOR_LABELS = {
     "model_coverage_complete": False,
     "physical_timing_verified": False,
@@ -40,6 +43,25 @@ SENSOR_FIELDS = (
     "fault_request",
     "sensor_evidence",
     "sensor_observation_spans",
+    "native_errors",
+)
+SPI_LABELS = {
+    "model_coverage_complete": False,
+    "physical_timing_verified": False,
+    "sensor_accuracy_verified": False,
+    "spi_electrical_behavior_verified": False,
+    "sensor_observation_semantics": "paused_LM74_property_SPI_enable_and_TIMER0_snapshot",
+    "sensor_sample_semantics": "guest_SPI_two_byte_word_and_signed_Q4_not_calibrated_temperature",
+    "frame_slip_semantics": "one_monitor_Transmit_consumes_model_byte_not_wire_fault",
+    "timer_observation_semantics": "guest_250kHz_TIMER0_IRQ_capture_not_host_time",
+}
+SPI_FIELDS = (
+    *SPI_LABELS,
+    "fault_scenario",
+    "fault_request",
+    "sensor_evidence",
+    "sensor_observation_spans",
+    "spi_frame_slip_span",
     "native_errors",
 )
 WASM_PROFILE = "esp32c3-wasm-flash-v1"
@@ -541,17 +563,28 @@ def validate_gpio_spans(source: dict) -> None:
 
 def sensor_summary(report: dict) -> dict:
     """Validate recorded structure, not the firmware's signed-temperature regression policy."""
+    spi = report.get("profile") == SPI_PROFILE
+    labels = SPI_LABELS if spi else SENSOR_LABELS
     require(
-        report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
-        and report.get("profile") == SENSOR_PROFILE
-        and all(
-            type(report.get(k)) is type(v) and report[k] == v for k, v in SENSOR_LABELS.items()
-        ),
+        report.get("schema_version")
+        == (
+            "embedded-sim-runner.spi-sensor-report.v1"
+            if spi
+            else "embedded-sim-runner.sensor-report.v1"
+        )
+        and report.get("profile") in SENSOR_PROFILES
+        and all(type(report.get(k)) is type(v) and report[k] == v for k, v in labels.items()),
         "invalid sensor identity/qualification",
     )
     fault = report.get("fault_scenario")
     require(
-        type(fault) is str and fault in ("none", "temperature-stuck", "temperature-offset"),
+        type(fault) is str
+        and fault
+        in (
+            ("none", "temperature-stuck", "frame-slip")
+            if spi
+            else ("none", "temperature-stuck", "temperature-offset")
+        ),
         "invalid sensor fault",
     )
     clock = report.get("virtual_time")
@@ -582,7 +615,14 @@ def sensor_summary(report: dict) -> dict:
             and set(effect) == {"id", "effect_observed", "status"}
             and effect["id"] == fault
             and (effect["effect_observed"] is None or type(effect["effect_observed"]) is bool)
-            and effect["status"] in ("not_evaluated", "not_requested", "observed", "not_observed"),
+            and effect["status"]
+            in (
+                "not_evaluated",
+                "not_requested",
+                "observed",
+                "not_observed",
+                *(("unknown",) if spi else ()),
+            ),
             "invalid sensor effect",
         )
         for key in ("ready_matches", "build_matches", "model_nominal", "sample_summary_truncated"):
@@ -593,8 +633,7 @@ def sensor_summary(report: dict) -> dict:
         require(
             evidence.get("fault_scenario") == fault
             and all(
-                type(evidence.get(k)) is type(v) and evidence[k] == v
-                for k, v in SENSOR_LABELS.items()
+                type(evidence.get(k)) is type(v) and evidence[k] == v for k, v in labels.items()
             ),
             "sensor assertion context differs",
         )
@@ -604,13 +643,27 @@ def sensor_summary(report: dict) -> dict:
             require(
                 isinstance(row, dict)
                 and set(row)
-                == {"sequence", "raw_byte", "celsius", "timer_ticks", "irq_vector", "error"},
+                == {
+                    "sequence",
+                    "raw_word" if spi else "raw_byte",
+                    "temperature_q4" if spi else "celsius",
+                    "timer_ticks",
+                    "irq_vector",
+                    "error",
+                },
                 "invalid sensor sample fields",
             )
             for field in ("sequence", "timer_ticks", "irq_vector", "error"):
                 integer(row[field], field, 0, 2**32 - 1)
-            integer(row["raw_byte"], "sensor raw byte", 0, 255)
-            integer(row["celsius"], "sensor signed value", -(2**31), 2**31 - 1)
+            integer(
+                row["raw_word" if spi else "raw_byte"], "sensor raw value", 0, 65535 if spi else 255
+            )
+            integer(
+                row["temperature_q4" if spi else "celsius"],
+                "sensor signed value",
+                -(2**31),
+                2**31 - 1,
+            )
         observations = evidence.get("model_observations")
         require(
             isinstance(observations, list) and len(observations) in (0, 4),
@@ -623,8 +676,8 @@ def sensor_summary(report: dict) -> dict:
                 == {
                     "phase",
                     "requested_virtual_ms",
-                    "temperature_celsius",
-                    "i2c_address",
+                    "temperature_q4" if spi else "temperature_celsius",
+                    "spi_enabled" if spi else "i2c_address",
                     "timer_counter",
                     "stdout_offset",
                     "stdout_bytes",
@@ -638,8 +691,18 @@ def sensor_summary(report: dict) -> dict:
                 == 20 + 20 * index,
                 "sensor observation order/boundary differs",
             )
-            integer(row["temperature_celsius"], "sensor property", -128, 127)
-            integer(row["i2c_address"], "sensor address", 0, 127)
+            integer(
+                row["temperature_q4" if spi else "temperature_celsius"],
+                "sensor property",
+                -880 if spi else -128,
+                2400 if spi else 127,
+            )
+            integer(
+                row["spi_enabled" if spi else "i2c_address"],
+                "sensor bus state",
+                0,
+                1 if spi else 127,
+            )
             integer(row["timer_counter"], "sensor counter", 0, 2**32 - 1)
             integer(row["stdout_offset"], "sensor stdout offset", 0, MAX_SOURCE_BYTES)
             integer(row["stdout_bytes"], "sensor stdout bytes", 1, 128)
@@ -648,6 +711,36 @@ def sensor_summary(report: dict) -> dict:
                 is not None,
                 "invalid sensor span hash",
             )
+        if spi:
+            require("frame_slip_observation" in evidence, "missing SPI frame observation field")
+            slip = evidence["frame_slip_observation"]
+            require(slip is None or isinstance(slip, dict), "invalid SPI slip observation")
+            if slip is not None:
+                require(
+                    fault == "frame-slip"
+                    and set(slip)
+                    == {
+                        "requested_virtual_ms",
+                        "discarded_byte",
+                        "stdout_offset",
+                        "stdout_bytes",
+                        "stdout_sha256",
+                    },
+                    "unexpected SPI slip fields",
+                )
+                require(
+                    type(slip["requested_virtual_ms"]) is int
+                    and slip["requested_virtual_ms"] == 22,
+                    "invalid SPI slip boundary",
+                )
+                integer(slip["discarded_byte"], "discarded model byte", 0, 255)
+                integer(slip["stdout_offset"], "slip stdout offset", 0, MAX_SOURCE_BYTES)
+                integer(slip["stdout_bytes"], "slip stdout bytes", 1, 128)
+                require(
+                    re.fullmatch(r"[0-9a-f]{64}", text(slip["stdout_sha256"], "slip span hash", 64))
+                    is not None,
+                    "invalid SPI slip hash",
+                )
     errors = report.get("errors")
     require(isinstance(errors, list) and len(errors) <= 16, "invalid sensor errors")
     for error in errors:
@@ -657,7 +750,7 @@ def sensor_summary(report: dict) -> dict:
         text(error["code"], "sensor error code", 128)
         text(error["message"], "sensor error", 2048)
     return {
-        **SENSOR_LABELS,
+        **labels,
         "fault_scenario": fault,
         "fault_request": {"id": fault, "requested_virtual_ms": None if fault == "none" else 22},
         "sensor_evidence": copy.deepcopy(evidence),
@@ -672,6 +765,7 @@ def validate_sensor_spans(source):
     spans = source.get("sensor_observation_spans")
     require(isinstance(spans, list) and len(spans) == len(rows), "invalid sensor spans")
     cursor = 0
+    spi = "frame_slip_semantics" in source
     for span, row in zip(spans, rows, strict=True):
         require(
             isinstance(span, dict)
@@ -687,9 +781,14 @@ def validate_sensor_spans(source):
         require(end - start <= 128, "sensor span exceeds budget")
         raw = decode_base64(span["raw_base64"])
         pattern = (
-            rb"SIM_SENSOR_OBS_"
+            (rb"SIM_SPI_OBS_" if spi else rb"SIM_SENSOR_OBS_")
             + str(row["phase"]).encode()
-            + rb"\r?\n(-?[0-9]{1,3})\r?\n([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n"
+            + (
+                rb"\r?\n(-?[0-9]{1,3}(?:\.[0-9]{1,4})?)\r?\n"
+                if spi
+                else rb"\r?\n(-?[0-9]{1,3})\r?\n"
+            )
+            + rb"([0-9]{1,10})\r?\n([0-9]{1,10})\r?\n"
         )
         match = re.fullmatch(pattern, raw)
         require(
@@ -697,14 +796,59 @@ def validate_sensor_spans(source):
             and len(raw) == end - start == row["stdout_bytes"]
             and start == row["stdout_offset"]
             and digest(raw) == span["sha256"] == row["stdout_sha256"]
-            and [int(v) for v in match.groups()]
-            == [row[k] for k in ("temperature_celsius", "i2c_address", "timer_counter")],
+            and (
+                [Decimal(match[1].decode()) * 16, int(match[2]), int(match[3])]
+                if spi
+                else [int(v) for v in match.groups()]
+            )
+            == [
+                row[k]
+                for k in (
+                    ("temperature_q4", "spi_enabled", "timer_counter")
+                    if spi
+                    else ("temperature_celsius", "i2c_address", "timer_counter")
+                )
+            ],
             "sensor span differs from recorded observation",
         )
         cursor = end
+    if spi:
+        validate_spi_slip_span(source)
 
 
-def sensor_spans(summary, stdout):
+def validate_spi_slip_span(source):
+    evidence = source["sensor_evidence"]
+    row = None if evidence is None else evidence["frame_slip_observation"]
+    require("spi_frame_slip_span" in source, "missing SPI slip span field")
+    span = source["spi_frame_slip_span"]
+    if row is None:
+        require(span is None, "unexpected SPI slip span")
+        return
+    require(
+        isinstance(span, dict) and set(span) == {"byte_start", "byte_end", "raw_base64", "sha256"},
+        "invalid SPI slip span fields",
+    )
+    ref = source["evidence_inputs"].get("backend.stdout.bin")
+    require(isinstance(ref, dict), "SPI slip stdout reference missing")
+    start = integer(span["byte_start"], "slip start", 0, ref["size_bytes"])
+    end = integer(span["byte_end"], "slip end", start + 1, ref["size_bytes"])
+    raw = decode_base64(span["raw_base64"])
+    match = re.fullmatch(rb"SIM_SPI_SLIP\r?\n([0-9]{1,3})\r?\n", raw)
+    observations = source["sensor_observation_spans"]
+    require(
+        match is not None
+        and len(raw) == end - start == row["stdout_bytes"] <= 128
+        and start == row["stdout_offset"]
+        and digest(raw) == span["sha256"] == row["stdout_sha256"]
+        and int(match[1]) == row["discarded_byte"]
+        and len(observations) == 4
+        and observations[0]["byte_end"] <= start
+        and end <= observations[1]["byte_start"],
+        "SPI slip span differs from native observation",
+    )
+
+
+def sensor_spans(summary, stdout, slip_span=None):
     evidence = summary["sensor_evidence"]
     rows = [] if evidence is None else evidence["model_observations"]
     spans = []
@@ -724,10 +868,26 @@ def sensor_spans(summary, stdout):
         {
             **summary,
             "sensor_observation_spans": spans,
+            **({"spi_frame_slip_span": slip_span} if "frame_slip_semantics" in summary else {}),
             "evidence_inputs": {"backend.stdout.bin": {"size_bytes": len(stdout)}},
         }
     )
     return spans
+
+
+def spi_slip_span(summary, stdout):
+    evidence = summary["sensor_evidence"]
+    row = None if evidence is None else evidence["frame_slip_observation"]
+    if row is None:
+        return None
+    start, size = row["stdout_offset"], row["stdout_bytes"]
+    raw = stdout[start : start + size]
+    return dict(
+        byte_start=start,
+        byte_end=start + size,
+        raw_base64=base64.b64encode(raw).decode("ascii"),
+        sha256=digest(raw),
+    )
 
 
 def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> int:
@@ -735,7 +895,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
-    sensor = report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
+    spi = report.get("schema_version") == "embedded-sim-runner.spi-sensor-report.v1"
+    sensor = spi or report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
     wasm = report.get("schema_version") == "embedded-sim-runner.esp-wasm-report.v1"
     fault = report.get("schema_version") == "embedded-sim-runner.gpio-fault-report.v1"
     gpio = fault or report.get("schema_version") == "embedded-sim-runner.gpio-timer-report.v1"
@@ -757,7 +918,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        SENSOR_PROFILE
+        SPI_PROFILE
+        if spi
+        else SENSOR_PROFILE
         if sensor
         else WASM_PROFILE
         if wasm
@@ -861,7 +1024,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.sensor-plan.v1"
+            "embedded-sim-runner.spi-sensor-plan.v1"
+            if spi
+            else "embedded-sim-runner.sensor-plan.v1"
             if sensor
             else "embedded-sim-runner.esp-wasm-plan.v1"
             if wasm
@@ -888,8 +1053,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         wasm_binding(report, plan, loaded, source)
     if sensor:
         summary = sensor_summary(report)
+        labels = SPI_LABELS if spi else SENSOR_LABELS
         require(
-            all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in SENSOR_LABELS.items())
+            all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in labels.items())
             and plan.get("fault_scenario") == summary["fault_scenario"]
             and plan.get("scenario", {}).get("fault") == summary["fault_request"]
             and plan.get("backend") == "renode"
@@ -899,8 +1065,12 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "sensor plan request/context/script differs",
         )
         source.update(summary)
+        stdout = loaded.get("backend.stdout.bin", b"")
+        if spi:
+            require(plan.get("runner_version") == "0.9.0", "unsupported SPI producer")
+            source["spi_frame_slip_span"] = spi_slip_span(summary, stdout)
         source["sensor_observation_spans"] = sensor_spans(
-            summary, loaded.get("backend.stdout.bin", b"")
+            summary, stdout, source.get("spi_frame_slip_span")
         )
         source["warnings"]["model_coverage_incomplete"] = 1
     if gpio:
