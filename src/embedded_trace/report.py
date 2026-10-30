@@ -22,6 +22,8 @@ from .simulation import (
     SPI_PROFILE,
     WASM_FIELDS,
     WASM_PROFILE,
+    WATCHDOG_FIELDS,
+    WATCHDOG_PROFILE,
 )
 from .timeline import SAFETY
 
@@ -156,6 +158,11 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                         )
                     }
                     if source.get("profile") in SENSOR_PROFILES
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in WATCHDOG_FIELDS}
+                    if source.get("profile") == WATCHDOG_PROFILE
                     else {}
                 ),
                 **(

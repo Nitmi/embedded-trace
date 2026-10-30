@@ -3,6 +3,41 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.15 on feat/watchdog-simulation-evidence adds watchdog evidence.
+The0.14 SPI notes below are published history. Read the watchdog section in
+docs/simulation.md before modifying the bounded representation checks.
+
+- Bind sim-runner0.10 watchdog schema/profile, plan/script/fault/clock and native
+  verdict/errors/unknowns. Preserve four model snapshots, guest boot/sample data,
+  raw reset and callback evidence. Imported/queried success is not test success.
+  No second native watchdog policy or physical-clock inference belongs here.
+- Every view validates before filtering. A moved timeline retains model/reset/
+  sample spans and global outcomes even on an empty page; it needs no original
+  runtime. Validate bounded numeric fields and exact raw byte/hash declarations.
+  Sample spans must be dicts before accessing .get; malformed types fail cleanly.
+- Python3.11/3.13 each585 passed/two existing platform skips; Ruff/format/offline
+  lock/diff pass. Added21 watchdog tests include rehashed contradictions and null
+  timeout evidence. Final cold smokes each138 CLI/24 package files. Joint pairs
+  verify65 non-RECORD files, with shared load/thermal kernels identical to HIL.
+- Both installed matrices:7 suites/72 CLI/9 actual simulations, zero retries.
+  14 watchdog sources preserve48 model spans,2 reset/callback pairs and148 UART
+  sample spans. Normal/mixed pass; both injected faults/wrong BUILD/timeout
+  fail-stop; preflight rejects before backend. Four normal UARTs equal sim0.10.
+  HIL0.15 saved instrument compatibility16 cases passes without device/SDK calls.
+- InstalledPy3.13 warm one+seven: normal two-source import9.11ms/410455 peakB;
+  inspect4.74ms/334093B, sample4.71ms/334093B, empty4.77ms/334093B. Feed-stop
+  inspect2.25ms/145474B; timeout0.60ms/44223B. Not RSS/startup/cold-I/O/SLA.
+  Process/network and source reopening guards apply to the measured view path.
+- Retained development findings: E501 long strings, test-only render/report alias
+  and a premature offline performance read were corrected; no native case was
+  retried. A span-type guard changed Trace after initial packaging, so only the
+  final rebuilt/reinstalled wheel and final cold-smoke receipts are authoritative.
+- Evidence D:/Code/tmp/hil-trace-watchdog-0150-20261030;299 protected files and raw
+  persistent PATH values/types unchanged. Local only; no release/tag/provenance.
+  Toolkit/plugin0.37 and station/locks/PATH unchanged. Next prepare the three
+  watchdog component releases. Model completeness, physical timing/reset and
+  low-power qualification remain false. Do not repeat completed native matrices.
+
 Current local0.14 on feat/spi-simulation-evidence adds explicit SPI evidence.
 The0.13.1 reader patch below is historical and already published.
 Read docs/simulation.md#spi-evidence-in-local-0140 before changing this path.

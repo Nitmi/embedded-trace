@@ -1,5 +1,40 @@
 # Offline simulation evidence
 
+## Watchdog evidence in local 0.15.0
+
+The explicit sim-runner **0.10.0** watchdog report/plan v1 and
+`nrf52840-watchdog-v1` pair has an independent adapter. Import binds staged
+plan/script, firmware, runtime lock, fault request and virtual-clock declaration.
+Trace never imports sim-runner or re-executes feeding, timing or reset policy.
+It retains bounded native `watchdog_evidence`, including each boot's samples,
+model snapshots, native reset records and their callbacks, errors and unknowns.
+
+`watchdog_observation_spans` bind six paused model values; `watchdog_reset_spans`
+pair the exact native `watchdog: Reseting machine` log (upstream spelling) with
+`SIM_WDT_RESET_MACRO`. `watchdog_sample_spans` bind recorded boot/sample indices
+and their UART sequence/request/run-state/timer/vector fields. Every span retains
+offset, size, raw base64 and SHA-256. Duplicate/partial/malformed/overflow fields,
+changed summaries, contradictory raw representation and invalid span layout fail.
+Matching raw numeric values checks saved representation, not firmware acceptance.
+
+The fixed reset macro only logs a callback. It does not reset, reload the image
+or patch memory. Its marker alone is not evidence of physical reset or protection.
+The original report remains the source of the nominal/fault verdict. Failed
+captures stay failed even if import or an empty query succeeds. Null assertions
+produce no invented samples, model records or reset spans.
+
+Inspect, full/sample/empty queries and Markdown keep all source fault/effect,
+clock and qualification fields. They validate the whole self-contained timeline
+before filtering and do not reopen the original files. Normal model success
+still carries a model-coverage warning. Physical timing/reset, low-power and
+complete-model qualifications remain false; CONFIG sleep/halt is not covered.
+Host capture windows, requested model boundaries and guest IRQ ticks are distinct;
+Trace does not assign an exact reset time from host logs or infer causality.
+
+HIL 0.15 producer versions are also accepted in existing saved instrument,
+waveform, load and thermal domains. Old versions remain explicit. Local hashes
+show integrity/consistency, not authenticity, publication or execution attestation.
+
 ## SPI evidence in local 0.14.0
 
 Trace accepts the explicit sim-runner 0.9.0

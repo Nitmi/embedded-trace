@@ -27,6 +27,27 @@ from .framing import Framer
 FORMAT = "sim-runner-report"
 SENSOR_PROFILE = "nrf52840-i2c-sensor-v1"
 SPI_PROFILE = "nrf52840-spi-sensor-v1"
+WATCHDOG_PROFILE = "nrf52840-watchdog-v1"
+WATCHDOG_LABELS = {
+    "model_coverage_complete": False,
+    "physical_timing_verified": False,
+    "physical_reset_verified": False,
+    "low_power_behavior_verified": False,
+    "watchdog_semantics": "Renode_1.17_running_state_dual_RR_magic_and_RequestReset",
+    "fault_semantics": "fixed_model_timer_stop_or_LimitTimer_disable_not_physical_fault",
+    "reset_evidence_semantics": "raw_watchdog_log_plus_guest_reboot_and_paused_snapshots",
+    "timer_observation_semantics": "guest_250kHz_TIMER0_IRQ_capture_not_host_time",
+}
+WATCHDOG_FIELDS = (
+    *WATCHDOG_LABELS,
+    "fault_scenario",
+    "fault_request",
+    "watchdog_evidence",
+    "watchdog_observation_spans",
+    "watchdog_reset_spans",
+    "watchdog_sample_spans",
+    "native_errors",
+)
 SENSOR_PROFILES = (SENSOR_PROFILE, SPI_PROFILE)
 SENSOR_LABELS = {
     "model_coverage_complete": False,
@@ -890,11 +911,367 @@ def spi_slip_span(summary, stdout):
     )
 
 
+def watchdog_summary(report):
+    """Validate bounded recorded fields; never evaluate feeding/reset acceptance policy."""
+    require(
+        report.get("schema_version") == "embedded-sim-runner.watchdog-report.v1"
+        and report.get("profile") == WATCHDOG_PROFILE
+        and all(
+            type(report.get(k)) is type(v) and report[k] == v for k, v in WATCHDOG_LABELS.items()
+        ),
+        "invalid watchdog identity/qualification",
+    )
+    fault = report.get("fault_scenario")
+    require(
+        type(fault) is str and fault in ("none", "feed-timer-stop", "watchdog-stop"),
+        "invalid watchdog fault",
+    )
+    clock = report.get("virtual_time")
+    require(
+        isinstance(clock, dict)
+        and set(clock) == {"domain", "requested_ms", "completed"}
+        and clock["domain"] == "renode_emulation"
+        and type(clock["requested_ms"]) is int
+        and clock["requested_ms"] == 82
+        and type(clock["completed"]) is bool,
+        "invalid watchdog clock",
+    )
+    evidence = report.get("assertions")
+    require(evidence is None or isinstance(evidence, dict), "invalid watchdog evidence")
+    require(not report["ok"] or isinstance(evidence, dict), "passing watchdog lacks evidence")
+    if evidence is not None:
+        require(
+            set(evidence)
+            == {
+                "nominal_regression_passed",
+                "nominal_failure",
+                "fault",
+                "boots",
+                "model_observations",
+                "reset_observations",
+                "fault_scenario",
+                *WATCHDOG_LABELS,
+            }
+            and type(evidence.get("nominal_regression_passed")) is bool
+            and evidence["fault_scenario"] == fault
+            and all(
+                type(evidence.get(k)) is type(v) and evidence[k] == v
+                for k, v in WATCHDOG_LABELS.items()
+            ),
+            "invalid watchdog assertion context",
+        )
+        failure = evidence["nominal_failure"]
+        require(failure is None or isinstance(failure, str), "invalid watchdog failure")
+        if failure is not None:
+            text(failure, "watchdog failure", 2048)
+        effect = evidence["fault"]
+        require(
+            isinstance(effect, dict)
+            and set(effect) == {"id", "effect_observed", "status"}
+            and effect["id"] == fault
+            and (effect["effect_observed"] is None or type(effect["effect_observed"]) is bool)
+            and effect["status"] in ("not_evaluated", "not_requested", "observed", "not_observed"),
+            "invalid watchdog effect",
+        )
+        boots = evidence["boots"]
+        require(isinstance(boots, list) and len(boots) <= 4, "invalid watchdog boots")
+        total = 0
+        for boot in boots:
+            require(
+                isinstance(boot, dict)
+                and set(boot) == {"samples"}
+                and isinstance(boot["samples"], list),
+                "invalid watchdog boot",
+            )
+            total += len(boot["samples"])
+            require(total <= 64, "watchdog sample budget exceeded")
+            for sample in boot["samples"]:
+                require(
+                    isinstance(sample, dict)
+                    and set(sample)
+                    == {
+                        "sequence",
+                        "partial_requests",
+                        "complete_requests",
+                        "running",
+                        "timer_ticks",
+                        "irq_vector",
+                    },
+                    "invalid watchdog sample fields",
+                )
+                for key, value in sample.items():
+                    integer(value, key, 0, 2**32 - 1)
+        observations = evidence["model_observations"]
+        require(
+            isinstance(observations, list) and len(observations) in (0, 4),
+            "invalid watchdog observation inventory",
+        )
+        for index, row in enumerate(observations):
+            require(
+                isinstance(row, dict)
+                and set(row)
+                == {
+                    "phase",
+                    "requested_virtual_ms",
+                    "running",
+                    "requests",
+                    "reload_value",
+                    "reload_enabled",
+                    "watchdog_counter",
+                    "timer_counter",
+                    "stdout_offset",
+                    "stdout_bytes",
+                    "stdout_sha256",
+                },
+                "invalid watchdog observation fields",
+            )
+            require(
+                type(row["phase"]) is int
+                and row["phase"] == index
+                and type(row["requested_virtual_ms"]) is int
+                and row["requested_virtual_ms"] == 20 + index * 20,
+                "invalid watchdog phase",
+            )
+            for key in (
+                "running",
+                "requests",
+                "reload_value",
+                "reload_enabled",
+                "watchdog_counter",
+                "timer_counter",
+            ):
+                integer(row[key], key, 0, 2**32 - 1)
+            watchdog_record(row)
+        resets = evidence["reset_observations"]
+        require(isinstance(resets, list) and len(resets) <= 3, "invalid watchdog reset inventory")
+        for row in resets:
+            require(
+                isinstance(row, dict)
+                and set(row) == {"stdout_offset", "stdout_bytes", "stdout_sha256", "callback"},
+                "invalid watchdog reset fields",
+            )
+            watchdog_record(row)
+            require(
+                isinstance(row["callback"], dict)
+                and set(row["callback"]) == {"stdout_offset", "stdout_bytes", "stdout_sha256"},
+                "invalid watchdog callback fields",
+            )
+            watchdog_record(row["callback"])
+    errors = report.get("errors")
+    require(isinstance(errors, list) and len(errors) <= 16, "invalid watchdog errors")
+    for error in errors:
+        require(
+            isinstance(error, dict) and set(error) == {"code", "message"}, "invalid watchdog error"
+        )
+        text(error["code"], "watchdog error code", 128)
+        text(error["message"], "watchdog error message", 2048)
+    return {
+        **WATCHDOG_LABELS,
+        "fault_scenario": fault,
+        "fault_request": {"id": fault, "requested_virtual_ms": None if fault == "none" else 22},
+        "watchdog_evidence": copy.deepcopy(evidence),
+        "native_errors": copy.deepcopy(errors),
+    }
+
+
+def watchdog_record(row):
+    integer(row["stdout_offset"], "watchdog offset", 0, MAX_SOURCE_BYTES)
+    integer(row["stdout_bytes"], "watchdog bytes", 1, 256)
+    require(
+        isinstance(row["stdout_sha256"], str)
+        and re.fullmatch(r"[0-9a-f]{64}", row["stdout_sha256"]) is not None,
+        "invalid watchdog record hash",
+    )
+
+
+def watchdog_span(data, start, size):
+    raw = data[start : start + size]
+    return dict(
+        byte_start=start,
+        byte_end=start + size,
+        raw_base64=base64.b64encode(raw).decode("ascii"),
+        sha256=digest(raw),
+    )
+
+
+def watchdog_spans(summary, stdout, uart, prefix):
+    evidence = summary["watchdog_evidence"]
+    observations, resets, samples = [], [], []
+    if evidence is not None:
+        observations = [
+            watchdog_span(stdout, r["stdout_offset"], r["stdout_bytes"])
+            for r in evidence["model_observations"]
+        ]
+        resets = [
+            dict(
+                reset=watchdog_span(stdout, r["stdout_offset"], r["stdout_bytes"]),
+                callback=watchdog_span(
+                    stdout, r["callback"]["stdout_offset"], r["callback"]["stdout_bytes"]
+                ),
+            )
+            for r in evidence["reset_observations"]
+        ]
+        cursor = 0
+        for boot_index, boot in enumerate(evidence["boots"]):
+            for sample_index, row in enumerate(boot["samples"]):
+                pattern = (
+                    re.escape(prefix.encode())
+                    + (
+                        f" {row['sequence']:08X} A={row['partial_requests']:08X}"
+                        f" B={row['complete_requests']:08X} S={row['running']:08X}"
+                        f" T={row['timer_ticks']:08X} V={row['irq_vector']:08X}"
+                    ).encode()
+                    + rb"\r?\n"
+                )
+                match = re.search(rb"(?m)^" + pattern, uart[cursor:])
+                require(match is not None, "watchdog recorded sample absent from raw UART")
+                start = cursor + match.start()
+                samples.append(
+                    dict(
+                        boot=boot_index,
+                        sample=sample_index,
+                        **watchdog_span(uart, start, len(match[0])),
+                    )
+                )
+                cursor += match.end()
+    return dict(
+        watchdog_observation_spans=observations,
+        watchdog_reset_spans=resets,
+        watchdog_sample_spans=samples,
+    )
+
+
+def validate_watchdog_spans(source, uart=None):
+    """Validate raw representation and bounds; keep recorded fault/regression policy unchanged."""
+    evidence = source["watchdog_evidence"]
+    obs = [] if evidence is None else evidence["model_observations"]
+    resets = [] if evidence is None else evidence["reset_observations"]
+    sample_rows = (
+        []
+        if evidence is None
+        else [
+            (bi, si, s)
+            for bi, b in enumerate(evidence["boots"])
+            for si, s in enumerate(b["samples"])
+        ]
+    )
+
+    def raw_span(span, filename, row=None, cursor=0, extra=()):
+        require(
+            isinstance(span, dict)
+            and set(span) == {"byte_start", "byte_end", "raw_base64", "sha256", *extra},
+            "invalid watchdog span fields",
+        )
+        ref = source["evidence_inputs"].get(filename)
+        require(isinstance(ref, dict), "missing watchdog raw reference")
+        start = integer(span["byte_start"], "watchdog span start", cursor, ref["size_bytes"])
+        end = integer(span["byte_end"], "watchdog span end", start + 1, ref["size_bytes"])
+        raw = decode_base64(span["raw_base64"])
+        require(
+            len(raw) == end - start <= 256 and digest(raw) == span["sha256"],
+            "invalid watchdog span hash/size",
+        )
+        if row is not None:
+            require(
+                start == row["stdout_offset"]
+                and len(raw) == row["stdout_bytes"]
+                and digest(raw) == row["stdout_sha256"],
+                "watchdog raw span binding differs",
+            )
+        return raw, end
+
+    for field, rows in (
+        ("watchdog_observation_spans", obs),
+        ("watchdog_reset_spans", resets),
+        ("watchdog_sample_spans", sample_rows),
+    ):
+        require(
+            isinstance(source.get(field), list) and len(source[field]) == len(rows),
+            "watchdog span inventory differs",
+        )
+    cursor = 0
+    for span, row in zip(source["watchdog_observation_spans"], obs, strict=True):
+        raw, cursor = raw_span(span, "backend.stdout.bin", row, cursor)
+        match = re.fullmatch(
+            rb"SIM_WDT_OBS_" + str(row["phase"]).encode() + rb"\r?\n" + rb"([0-9]{1,10})\r?\n" * 6,
+            raw,
+        )
+        require(
+            match is not None
+            and list(map(int, match.groups()))
+            == [
+                row[k]
+                for k in (
+                    "running",
+                    "requests",
+                    "reload_value",
+                    "reload_enabled",
+                    "watchdog_counter",
+                    "timer_counter",
+                )
+            ],
+            "watchdog model bytes differ from recorded fields",
+        )
+    cursor = 0
+    for pair, row in zip(source["watchdog_reset_spans"], resets, strict=True):
+        require(
+            isinstance(pair, dict) and set(pair) == {"reset", "callback"},
+            "invalid watchdog reset span pair",
+        )
+        raw, cursor = raw_span(pair["reset"], "backend.stdout.bin", row, cursor)
+        require(
+            re.fullmatch(rb"[^\r\n]*\[INFO\] watchdog: Reseting machine\r?\n", raw) is not None,
+            "watchdog reset raw record differs",
+        )
+        raw, cursor = raw_span(pair["callback"], "backend.stdout.bin", row["callback"], cursor)
+        require(
+            re.fullmatch(rb"SIM_WDT_RESET_MACRO\r?\n", raw) is not None,
+            "watchdog reset callback differs",
+        )
+    cursor = 0
+    for span, (bi, si, row) in zip(source["watchdog_sample_spans"], sample_rows, strict=True):
+        require(
+            isinstance(span, dict)
+            and type(span.get("boot")) is int
+            and span["boot"] == bi
+            and type(span.get("sample")) is int
+            and span["sample"] == si,
+            "watchdog sample span index differs",
+        )
+        raw, cursor = raw_span(span, "uart.bin", cursor=cursor, extra=("boot", "sample"))
+        match = re.fullmatch(
+            rb"[ -~]{1,160} ([0-9A-F]{8}) A=([0-9A-F]{8}) B=([0-9A-F]{8})"
+            rb" S=([0-9A-F]{8}) T=([0-9A-F]{8}) V=([0-9A-F]{8})\r?\n",
+            raw,
+        )
+        require(
+            match is not None
+            and [int(v, 16) for v in match.groups()]
+            == [
+                row[k]
+                for k in (
+                    "sequence",
+                    "partial_requests",
+                    "complete_requests",
+                    "running",
+                    "timer_ticks",
+                    "irq_vector",
+                )
+            ],
+            "watchdog guest bytes differ from recorded fields",
+        )
+        if uart is not None:
+            require(
+                uart[span["byte_start"] : cursor] == raw, "watchdog sample span differs from UART"
+            )
+
+
 def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> int:
     require(
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    watchdog = report.get("schema_version") == "embedded-sim-runner.watchdog-report.v1"
     spi = report.get("schema_version") == "embedded-sim-runner.spi-sensor-report.v1"
     sensor = spi or report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
     wasm = report.get("schema_version") == "embedded-sim-runner.esp-wasm-report.v1"
@@ -904,7 +1281,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        wasm
+        watchdog
+        or wasm
         or sensor
         or gpio
         or flash
@@ -918,7 +1296,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        SPI_PROFILE
+        WATCHDOG_PROFILE
+        if watchdog
+        else SPI_PROFILE
         if spi
         else SENSOR_PROFILE
         if sensor
@@ -1024,7 +1404,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.spi-sensor-plan.v1"
+            "embedded-sim-runner.watchdog-plan.v1"
+            if watchdog
+            else "embedded-sim-runner.spi-sensor-plan.v1"
             if spi
             else "embedded-sim-runner.sensor-plan.v1"
             if sensor
@@ -1051,6 +1433,32 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         )
     if wasm:
         wasm_binding(report, plan, loaded, source)
+    if watchdog:
+        summary = watchdog_summary(report)
+        require(
+            plan.get("runner_version") == "0.10.0"
+            and all(
+                type(plan.get(k)) is type(v) and plan[k] == v for k, v in WATCHDOG_LABELS.items()
+            )
+            and plan.get("fault_scenario") == summary["fault_scenario"]
+            and plan.get("scenario", {}).get("fault") == summary["fault_request"]
+            and plan.get("backend") == "renode"
+            and type(plan.get("virtual_ms")) is int
+            and plan["virtual_ms"] == 82
+            and digest(loaded["run.resc"]) == plan.get("script_sha256"),
+            "watchdog plan request/context/script differs",
+        )
+        source.update(summary)
+        source.update(
+            watchdog_spans(
+                summary,
+                loaded.get("backend.stdout.bin", b""),
+                loaded.get("uart.bin", b""),
+                plan["assertions"]["heartbeat_prefix"],
+            )
+        )
+        validate_watchdog_spans({**source, "evidence_inputs": refs}, loaded.get("uart.bin", b""))
+        source["warnings"]["model_coverage_incomplete"] = 1
     if sensor:
         summary = sensor_summary(report)
         labels = SPI_LABELS if spi else SENSOR_LABELS
@@ -1067,7 +1475,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         source.update(summary)
         stdout = loaded.get("backend.stdout.bin", b"")
         if spi:
-            require(plan.get("runner_version") == "0.9.0", "unsupported SPI producer")
+            require(plan.get("runner_version") in ("0.9.0", "0.10.0"), "unsupported SPI producer")
             source["spi_frame_slip_span"] = spi_slip_span(summary, stdout)
         source["sensor_observation_spans"] = sensor_spans(
             summary, stdout, source.get("spi_frame_slip_span")

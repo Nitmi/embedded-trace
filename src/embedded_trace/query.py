@@ -38,13 +38,17 @@ from .simulation import (
     SPI_FIELDS,
     WASM_FIELDS,
     WASM_PROFILE,
+    WATCHDOG_FIELDS,
+    WATCHDOG_PROFILE,
     gpio_summary,
     model_limits,
     s3_summary,
     sensor_summary,
     validate_gpio_spans,
     validate_sensor_spans,
+    validate_watchdog_spans,
     wasm_summary,
+    watchdog_summary,
 )
 from .timeline import ORDERING, SAFETY
 
@@ -491,6 +495,23 @@ def validate(document: dict) -> None:
                     "sensor declarations/clock/qualification changed",
                 )
                 validate_sensor_spans(source)
+            if source["profile"] == WATCHDOG_PROFILE:
+                expected = watchdog_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["virtual_time"] == report["virtual_time"]
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "watchdog declarations/clock/qualification changed",
+                )
+                validate_watchdog_spans(
+                    source,
+                    b"".join(
+                        decode_base64(e["payload"]["raw_base64"])
+                        for e in local
+                        if e["kind"] == "line"
+                    ),
+                )
             require(
                 isinstance(report.get("artifacts"), dict)
                 and set(report["artifacts"]) == set(source["evidence_inputs"])
@@ -573,6 +594,7 @@ def simulation_sources(document: dict) -> dict:
         *S3_FIELDS,
         *SENSOR_FIELDS,
         *SPI_FIELDS,
+        *WATCHDOG_FIELDS,
         *WASM_FIELDS,
     )
     return {

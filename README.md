@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.15.0** adds [watchdog evidence views](docs/simulation.md#watchdog-evidence-in-local-0150).
+Model snapshots, native reset/callback logs and guest samples retain exact byte
+spans, native failures and false physical/reset/low-power qualifications. Every
+view validates complete input before filtering; no simulator or hardware opens.
+
 Local **0.14.0** adds [SPI/LM74 saved evidence](docs/simulation.md#spi-evidence-in-local-0140):
 signed fractional values, model snapshots and a separate byte-frame-slip span,
 with failures and unknown effects retained in full, filtered and empty views.
