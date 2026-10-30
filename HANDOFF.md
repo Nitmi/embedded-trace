@@ -33,6 +33,11 @@ remain historical. Runtime stays offline, standard-library-only and device-free.
 - Evidence D:/Code/tmp/hil-trace-rtc-0160-20261030; final test/build/candidate
   receipts and sealed report tracked there plus desktop/global handoff. Native
   attempts completed once; no repeat to correct auxiliary audit assumptions.
+- Above installed counts/performance describe the initial CRLF qualification.
+  Final source build requires LF bytes equal to Git. After proven newline-only
+  normalization, final wheels receive independent cold/matrix qualification;
+  retain old captures and distinguish hashes. release.py must explicitly admit
+  rtc.py at0.16 and reject it on older versions; three release tests cover this.
 - Pitfalls: keep raw long regex/string literals split for Ruff; apply_patch
   multi-file failure is atomic, so verify corrected files before rerunning a
   check. Development helper copies need explicit UTF-8. RTC BUILD rejection
