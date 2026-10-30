@@ -40,6 +40,8 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, ver
     """Independent minimal distribution fixture; contents are never imported."""
     metadata = f"embedded_trace-{version}.dist-info/"
     wheel = {"embedded_trace/" + name: b"# synthetic module\n" for name in MODULES}
+    if tuple(map(int, version.split("."))) >= (0, 16, 0):
+        wheel["embedded_trace/rtc.py"] = b"# synthetic RTC\n"
     if tuple(map(int, version.split("."))) >= (0, 12, 0):
         wheel["embedded_trace/thermal.py"] = b"# synthetic thermal\n"
         wheel["embedded_trace/thermal_protocol.py"] = b"# synthetic thermal protocol\n"
@@ -123,6 +125,31 @@ def manifest_edit(directory, change):
     value = json.loads(path.read_bytes())
     change(value)
     path.write_bytes((json.dumps(value, sort_keys=True) + "\n").encode())
+
+
+def test_rtc_release_accepts_complete_new_payload(tmp_path):
+    archives(tmp_path, version="0.16.0")
+    release.create_manifest(tmp_path, "0.16.0", REVISION)
+    result = release.verify(tmp_path, REVISION)
+    assert result["ok"] and result["wheel_members"] == 30 and result["source_members"] == 29
+
+
+def test_rtc_release_requires_new_module(tmp_path):
+    archives(
+        tmp_path, version="0.16.0", mutate=lambda wheel, source: wheel.pop("embedded_trace/rtc.py")
+    )
+    with pytest.raises(ValueError, match="wheel files"):
+        release.create_manifest(tmp_path, "0.16.0", REVISION)
+
+
+def test_old_release_rejects_new_module(tmp_path):
+    archives(
+        tmp_path,
+        version="0.15.0",
+        mutate=lambda wheel, source: wheel.update({"embedded_trace/rtc.py": b"# unexpected RTC\n"}),
+    )
+    with pytest.raises(ValueError, match="wheel files"):
+        release.create_manifest(tmp_path, "0.15.0", REVISION)
 
 
 def test_instrument_release_accepts_complete_new_payloads(tmp_path):

@@ -3,6 +3,44 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.16 on feat/rtc-simulation-evidence adds explicit RTC evidence views.
+Read docs/simulation.md#rtc-evidence-in-local-0160 first. The0.15 notes below
+remain historical. Runtime stays offline, standard-library-only and device-free.
+
+- rtc.py binds sim0.11 RTC plan/report/profile, script/fault/clock, bounded native
+  declarations, false qualifications, errors and unknowns. No native firmware
+  policy is replayed. Failed captures remain failed through successful queries.
+- Model register spans, ordered counter/event/next-compare/prescaler/vector UART
+  spans and a separate fault marker retain offsets/base64/SHA-256. Validate
+  representations/bounds before filtering. Saved views reopen no original inputs.
+  LFCLK, overflow/wrap, PPI and sleep/power/physical timing stay outside coverage.
+- Exact runtime release inventory grows to25 files at0.16 (18 modules/7 schemas).
+  Package smoke and source-bound release validation both admit the new module;
+  older releases still reject it. Record its hash in the final candidate, without
+  treating local hashes as attestation/authenticity.
+- Two independent installed pairs pass RTC7 suites/72 CLIs/9 native attempts per
+  Python, zero retries, complete cleanup;14 RTC sources preserve48 model spans,
+  68 UART samples and4 fault markers. Full/sample/empty/Markdown/moved views and
+  rehashed contradiction rejection pass.16 old-domain HIL0.16 compatibility cases
+  pass; shared load/thermal protocol files remain byte-identical to HIL.
+- Final Python3.11/3.13 each609 tests passed/two existing platform skips,
+  including new0.16 exact release-inventory positive/missing/old-version cases.
+  Ruff/format/offline lock/diff pass; each installed package smoke verifies25
+  runtime files and138 CLI commands, without new runtime dependencies.
+- Warm Python3.13 normal-pair correlate/inspect medians6.83/3.16ms; Python
+  allocation peaks360539/244708B. One warmup/seven timings/separate allocation
+  capture under no-process/no-network/source-reopen guards. Not startup/RSS/SLA.
+- Evidence D:/Code/tmp/hil-trace-rtc-0160-20261030; final test/build/candidate
+  receipts and sealed report tracked there plus desktop/global handoff. Native
+  attempts completed once; no repeat to correct auxiliary audit assumptions.
+- Pitfalls: keep raw long regex/string literals split for Ruff; apply_patch
+  multi-file failure is atomic, so verify corrected files before rerunning a
+  check. Development helper copies need explicit UTF-8. RTC BUILD rejection
+  precedes sample parsing (zero samples), even though model spans remain.
+  Retain host-side failures separately from emulator/firmware failures.
+- No public write or Toolkit/locks/PATH/plugin/hardware change. Next prepare
+  joint sim0.11/HIL0.16/Trace0.16 release materials from clean qualified commits.
+
 Current local0.15 on feat/watchdog-simulation-evidence adds watchdog evidence.
 The0.14 SPI notes below are published history. Read the watchdog section in
 docs/simulation.md before modifying the bounded representation checks.

@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.16.0** adds [RTC evidence views](docs/simulation.md#rtc-evidence-in-local-0160).
+Counter/event/compare/prescaler/vector samples, paused model registers and a
+separate fault marker retain exact raw spans, native failures and unknowns.
+Full, filtered, empty and Markdown views remain offline.
+
 Local **0.15.0** adds [watchdog evidence views](docs/simulation.md#watchdog-evidence-in-local-0150).
 Model snapshots, native reset/callback logs and guest samples retain exact byte
 spans, native failures and false physical/reset/low-power qualifications. Every

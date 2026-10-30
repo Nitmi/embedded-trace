@@ -23,6 +23,7 @@ from .common import (
     text,
 )
 from .framing import Framer
+from .rtc import RTC_LABELS, RTC_PROFILE, rtc_spans, rtc_summary, validate_rtc_spans
 
 FORMAT = "sim-runner-report"
 SENSOR_PROFILE = "nrf52840-i2c-sensor-v1"
@@ -1271,6 +1272,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    rtc = report.get("schema_version") == "embedded-sim-runner.rtc-report.v1"
     watchdog = report.get("schema_version") == "embedded-sim-runner.watchdog-report.v1"
     spi = report.get("schema_version") == "embedded-sim-runner.spi-sensor-report.v1"
     sensor = spi or report.get("schema_version") == "embedded-sim-runner.sensor-report.v1"
@@ -1281,7 +1283,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        watchdog
+        rtc
+        or watchdog
         or wasm
         or sensor
         or gpio
@@ -1296,7 +1299,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        WATCHDOG_PROFILE
+        RTC_PROFILE
+        if rtc
+        else WATCHDOG_PROFILE
         if watchdog
         else SPI_PROFILE
         if spi
@@ -1404,7 +1409,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.watchdog-plan.v1"
+            "embedded-sim-runner.rtc-plan.v1"
+            if rtc
+            else "embedded-sim-runner.watchdog-plan.v1"
             if watchdog
             else "embedded-sim-runner.spi-sensor-plan.v1"
             if spi
@@ -1433,10 +1440,34 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         )
     if wasm:
         wasm_binding(report, plan, loaded, source)
+    if rtc:
+        summary = rtc_summary(report)
+        require(
+            plan.get("runner_version") == "0.11.0"
+            and all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in RTC_LABELS.items())
+            and plan.get("fault_scenario") == summary["fault_scenario"]
+            and plan.get("scenario", {}).get("fault") == summary["fault_request"]
+            and plan.get("backend") == "renode"
+            and type(plan.get("virtual_ms")) is int
+            and plan["virtual_ms"] == 162
+            and digest(loaded["run.resc"]) == plan.get("script_sha256"),
+            "RTC plan request/context/script differs",
+        )
+        source.update(summary)
+        source.update(
+            rtc_spans(
+                summary,
+                loaded.get("backend.stdout.bin", b""),
+                loaded.get("uart.bin", b""),
+                plan["assertions"]["heartbeat_prefix"],
+            )
+        )
+        validate_rtc_spans({**source, "evidence_inputs": refs}, loaded.get("uart.bin", b""))
+        source["warnings"]["model_coverage_incomplete"] = 1
     if watchdog:
         summary = watchdog_summary(report)
         require(
-            plan.get("runner_version") == "0.10.0"
+            plan.get("runner_version") in ("0.10.0", "0.11.0")
             and all(
                 type(plan.get(k)) is type(v) and plan[k] == v for k, v in WATCHDOG_LABELS.items()
             )
@@ -1475,7 +1506,10 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         source.update(summary)
         stdout = loaded.get("backend.stdout.bin", b"")
         if spi:
-            require(plan.get("runner_version") in ("0.9.0", "0.10.0"), "unsupported SPI producer")
+            require(
+                plan.get("runner_version") in ("0.9.0", "0.10.0", "0.11.0"),
+                "unsupported SPI producer",
+            )
             source["spi_frame_slip_span"] = spi_slip_span(summary, stdout)
         source["sensor_observation_spans"] = sensor_spans(
             summary, stdout, source.get("spi_frame_slip_span")

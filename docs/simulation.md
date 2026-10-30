@@ -1,5 +1,33 @@
 # Offline simulation evidence
 
+## RTC evidence in local 0.16.0
+
+Accept the explicit sim-runner **0.11.0** RTC report/plan v1 and
+`nrf52840-rtc-v1` pair. Bind staged plan/script, firmware, runtime lock,
+fault request and requested 162 ms virtual clock. Trace never imports sim-runner
+or reruns its firmware acceptance policy. Recorded failures and unknown assertions
+remain failed/unknown, including when import or a query succeeds.
+
+`rtc_evidence` retains counter/event/next-compare/prescaler/vector samples and
+paused register observations. `rtc_sample_spans` bind each recorded sample to
+ordered raw UART bytes; `rtc_observation_spans` bind five decimal model values.
+`rtc_fault_span` separately binds the fixed marker between observations 0 and 1,
+when completed model evidence exists. Each span preserves offset, raw base64 and
+SHA-256. Unknown evidence invents no spans or fault effect. Validate exact bounded
+fields, numeric representations and ordering, without judging nominal timing.
+
+Inspect, full/sample/empty queries and Markdown preserve the entire source
+summary and validate before filtering. Saved timelines work without reopening
+original files or launching any executable. Guest IRQ counter, model requested
+boundaries and host capture windows remain distinct, without synchronization or
+causality claims. LFCLK startup/drift, overflow/wrap, PPI and sleep/power are not
+covered; physical timing, low-power and complete model qualifications stay false.
+
+HIL 0.16 producers are also accepted in saved instrument, waveform, load and
+thermal domains. Older explicit versions remain supported. sim-runner 0.11 may
+also produce the existing watchdog and SPI schemas. Local hashes prove internal
+consistency, not authenticity, release provenance or physical qualification.
+
 ## Watchdog evidence in local 0.15.0
 
 The explicit sim-runner **0.10.0** watchdog report/plan v1 and

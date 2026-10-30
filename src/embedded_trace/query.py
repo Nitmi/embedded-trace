@@ -24,6 +24,7 @@ from .common import (
     require,
     text,
 )
+from .rtc import RTC_FIELDS, RTC_PROFILE, rtc_summary, validate_rtc_spans
 from .simulation import (
     FAULT_FIELDS,
     FAULT_PROFILE,
@@ -495,6 +496,23 @@ def validate(document: dict) -> None:
                     "sensor declarations/clock/qualification changed",
                 )
                 validate_sensor_spans(source)
+            if source["profile"] == RTC_PROFILE:
+                expected = rtc_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["virtual_time"] == report["virtual_time"]
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "RTC declarations/clock/qualification changed",
+                )
+                validate_rtc_spans(
+                    source,
+                    b"".join(
+                        decode_base64(e["payload"]["raw_base64"])
+                        for e in local
+                        if e["kind"] == "line"
+                    ),
+                )
             if source["profile"] == WATCHDOG_PROFILE:
                 expected = watchdog_summary(report)
                 require(
@@ -595,6 +613,7 @@ def simulation_sources(document: dict) -> dict:
         *SENSOR_FIELDS,
         *SPI_FIELDS,
         *WATCHDOG_FIELDS,
+        *RTC_FIELDS,
         *WASM_FIELDS,
     )
     return {
