@@ -1,5 +1,20 @@
 # Bounded file reads
 
+## EGU evidence cost in local 0.17.0
+
+Windows CPython3.13, installed wheels, 2026-11-03: a saved two-source EGU suite,
+one warmup, seven in-process timings and a separate tracemalloc capture.
+Trace correlate/inspect medians were8.25/4.26ms with Python allocation peaks
+411,473/307,598B. Sample and empty pages still validate the entire timeline:
+medians4.40/4.34ms, peaks307,548/307,598B. HIL's full saved-suite inspection was
+169.79ms/17,149,135B, including its larger component/artifact inventory.
+
+Audit hooks reject process/network starts and any saved view reopening an
+original source; only the relocated timeline is readable for inspect/query.
+Full, fault and timeout evidence are measured separately in the local receipt.
+These are warm host costs, not RSS, cold IO, startup costs or an SLA. Parsing,
+hashing and raw-span validation still scale with complete saved evidence size.
+
 Version 0.13.1 uses the opened regular file's size as an allocation hint. The
 previous reader requested the full byte limit plus one, temporarily allocating
 about 64 MiB even for a tiny timeline. Input/output schemas and CLI syntax are

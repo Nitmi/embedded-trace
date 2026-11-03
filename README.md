@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.17.0** adds [EGU evidence views](docs/simulation.md#egu-evidence-in-local-0170).
+Ordered PRE/POST registers, guest IRQ samples and fault markers retain their
+original bytes, native failures and unknowns in full, filtered and empty views.
+Bounded asynchronous lifecycle logs stay inside their original observation spans.
+
 Local **0.16.0** adds [RTC evidence views](docs/simulation.md#rtc-evidence-in-local-0160).
 Counter/event/compare/prescaler/vector samples, paused model registers and a
 separate fault marker retain exact raw spans, native failures and unknowns.

@@ -3,6 +3,37 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.17 on feat/egu-simulation-evidence adds offline EGU views;
+the local0.16 RTC notes below remain history. Read the EGU section in
+docs/simulation.md before changing this path.
+
+- egu.py validates saved structure and exact raw byte spans, never native firmware
+  policy. Preserve failed/unknown outcomes and false physical/PPI qualifications
+  across full, filtered, empty and Markdown views. No runtime execution is added.
+- Each observation has5 numeric fields. Up to4 exact Renode lifecycle INFO lines
+  may precede each value; retain them in the original span (bounded2048 bytes).
+  Unrelated logs, missing values, false indices and rehashed contradictions fail.
+- Release0.17 adds egu.py:26 runtime files (19 modules/7 schemas); older releases
+  still reject it. New and legacy producer versions remain explicit in readers.
+- The first focused run caught a test fixture accidentally changed to fault
+  stimulus_index=18 during mechanical adaptation. Correct production validation
+  rejected it; restore fixture index4. Keep the original failed run as history.
+- Dual-Python full suites/static checks pass; installed joint qualification is
+  tracked in D:/Code/tmp/hil-trace-egu-0170-20261103. Candidates are local only.
+- Final installed qualification: each Python has7 suites/72 CLI checks/9 native
+  attempts;14 EGU sources retain216 model spans/84 guest samples/4 fault markers.
+  Wrong BUILD preserves model observations while guest parsing remains failed.
+  Both relocated native evidence sets pass offline inspection without original
+  runtime/firmware access; full/sample/empty/Markdown views retain source outcomes.
+- Final Trace tests each639 passed/two existing platform skips. Both cold smokes
+  verify26 runtime files and138 CLI commands;16 old instrument-domain HIL0.17
+  compatibility cases pass. Shared load/thermal protocol bytes stay identical.
+- Warm installed Python3.13 normal-pair correlate/inspect medians8.25/4.26ms;
+  Python peaks411473/307598B. One warmup/seven timings/separate allocation capture,
+  no subprocess/network, and saved views may open only their moved timeline.
+  Not RSS, cold IO, startup or SLA. Final parallel Sim candidate d42d0f2 fixes
+  shared Renode history; initial failed controls remain preserved as history.
+
 Current local0.16 on feat/rtc-simulation-evidence adds explicit RTC evidence views.
 Read docs/simulation.md#rtc-evidence-in-local-0160 first. The0.15 notes below
 remain historical. Runtime stays offline, standard-library-only and device-free.

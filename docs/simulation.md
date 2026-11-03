@@ -260,6 +260,31 @@ source directory is removed. Flash diagnostics, qualified/failed outcomes and
 false coverage/security claims remain unchanged; complete SMP, debug attachment,
 Flash commands or physical behavior cannot be inferred from this view.
 
+## EGU evidence in local 0.17.0
+
+Trace accepts sim-runner 0.12.0's distinct EGU plan/report and fixed
+`nrf52840-egu-v1` profile. It binds plan, script, labels, clock and fault request;
+`fault_request.stimulus_index` is a zero-based requested schedule index, not a
+measured host timestamp. Earlier RTC/watchdog/SPI profiles also accept the new
+producer while retaining their own identity and clock semantics.
+
+`egu_evidence`, `egu_observation_spans`, `egu_sample_spans`, `egu_fault_span` and
+native errors remain visible in inspect/query/empty-page/Markdown results.
+Each model span binds the native stdout offset/length/hash and saved event array
+on channels 0/1/3/15, PRE/POST label and interrupt mask. Its maximum is 2048 bytes
+to preserve the native parser's bounded exact asynchronous paused/resumed INFO
+lines. Guest samples preserve sequence, channel, before/after event values,
+interrupt mask and vector. These representation checks never rejudge firmware
+correctness or turn successful import into a passing capture.
+
+Failed captures, nominal failure, observed/not-observed/unknown effects and null
+assertions remain unchanged. Model completeness, physical timing and PPI routing
+verification stay false. No guest task producer, complete channel coverage,
+external signal, IRQ latency/priority or physical qualification follows.
+Source budgets remain 8 MiB, at most 32 guest samples and 18 snapshots per source.
+All spans are checked before filters; views reopen only the saved timeline.
+Raw-span consistency is neither source authentication nor native re-execution.
+
 ## Sensor evidence
 
 Trace 0.13 accepts native `embedded-sim-runner.sensor-report.v1` for the fixed
