@@ -24,6 +24,13 @@ from .common import (
 )
 from .egu import EGU_LABELS, EGU_PROFILE, egu_spans, egu_summary, validate_egu_spans
 from .framing import Framer
+from .gpiote import (
+    GPIOTE_LABELS,
+    GPIOTE_PROFILE,
+    gpiote_spans,
+    gpiote_summary,
+    validate_gpiote_spans,
+)
 from .rtc import RTC_LABELS, RTC_PROFILE, rtc_spans, rtc_summary, validate_rtc_spans
 
 FORMAT = "sim-runner-report"
@@ -1273,6 +1280,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         len(raw) <= MAX_RECORD_BYTES, "simulation report exceeds record limit", "LIMIT_EXCEEDED"
     )
     report = parse_json(raw)
+    gpiote = report.get("schema_version") == "embedded-sim-runner.gpiote-report.v1"
     egu = report.get("schema_version") == "embedded-sim-runner.egu-report.v1"
     rtc = report.get("schema_version") == "embedded-sim-runner.rtc-report.v1"
     watchdog = report.get("schema_version") == "embedded-sim-runner.watchdog-report.v1"
@@ -1285,7 +1293,8 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     flash = s3 or report.get("schema_version") == "embedded-sim-runner.qemu-flash-report.v1"
     qemu = report.get("schema_version") == "embedded-sim-runner.qemu-report.v1"
     require(
-        egu
+        gpiote
+        or egu
         or rtc
         or watchdog
         or wasm
@@ -1302,7 +1311,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
             "invalid simulation boundary",
         )
     profile = (
-        EGU_PROFILE
+        GPIOTE_PROFILE
+        if gpiote
+        else EGU_PROFILE
         if egu
         else RTC_PROFILE
         if rtc
@@ -1414,7 +1425,9 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         plan.get("profile") == profile
         and plan.get("schema_version")
         == (
-            "embedded-sim-runner.egu-plan.v1"
+            "embedded-sim-runner.gpiote-plan.v1"
+            if gpiote
+            else "embedded-sim-runner.egu-plan.v1"
             if egu
             else "embedded-sim-runner.rtc-plan.v1"
             if rtc
@@ -1447,10 +1460,34 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         )
     if wasm:
         wasm_binding(report, plan, loaded, source)
+    if gpiote:
+        summary = gpiote_summary(report)
+        require(
+            plan.get("runner_version") == "0.13.0"
+            and all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in GPIOTE_LABELS.items())
+            and plan.get("fault_scenario") == summary["fault_scenario"]
+            and plan.get("scenario", {}).get("fault") == summary["fault_request"]
+            and plan.get("backend") == "renode"
+            and type(plan.get("virtual_ms")) is int
+            and plan["virtual_ms"] == 40
+            and digest(loaded["run.resc"]) == plan.get("script_sha256"),
+            "GPIOTE plan request/context/script differs",
+        )
+        source.update(summary)
+        source.update(
+            gpiote_spans(
+                summary,
+                loaded.get("backend.stdout.bin", b""),
+                loaded.get("uart.bin", b""),
+                plan["assertions"]["heartbeat_prefix"],
+            )
+        )
+        validate_gpiote_spans({**source, "evidence_inputs": refs}, loaded.get("uart.bin", b""))
+        source["warnings"]["model_coverage_incomplete"] = 1
     if egu:
         summary = egu_summary(report)
         require(
-            plan.get("runner_version") == "0.12.0"
+            plan.get("runner_version") in ("0.12.0", "0.13.0")
             and all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in EGU_LABELS.items())
             and plan.get("fault_scenario") == summary["fault_scenario"]
             and plan.get("scenario", {}).get("fault") == summary["fault_request"]
@@ -1474,7 +1511,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     if rtc:
         summary = rtc_summary(report)
         require(
-            plan.get("runner_version") in ("0.11.0", "0.12.0")
+            plan.get("runner_version") in ("0.11.0", "0.12.0", "0.13.0")
             and all(type(plan.get(k)) is type(v) and plan[k] == v for k, v in RTC_LABELS.items())
             and plan.get("fault_scenario") == summary["fault_scenario"]
             and plan.get("scenario", {}).get("fault") == summary["fault_request"]
@@ -1498,7 +1535,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
     if watchdog:
         summary = watchdog_summary(report)
         require(
-            plan.get("runner_version") in ("0.10.0", "0.11.0", "0.12.0")
+            plan.get("runner_version") in ("0.10.0", "0.11.0", "0.12.0", "0.13.0")
             and all(
                 type(plan.get(k)) is type(v) and plan[k] == v for k, v in WATCHDOG_LABELS.items()
             )
@@ -1538,7 +1575,7 @@ def import_report(raw: bytes, path: Path, source: dict, events: list[dict]) -> i
         stdout = loaded.get("backend.stdout.bin", b"")
         if spi:
             require(
-                plan.get("runner_version") in ("0.9.0", "0.10.0", "0.11.0", "0.12.0"),
+                plan.get("runner_version") in ("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"),
                 "unsupported SPI producer",
             )
             source["spi_frame_slip_span"] = spi_slip_span(summary, stdout)

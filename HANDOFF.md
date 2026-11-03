@@ -3,6 +3,26 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.18 on feat/gpiote-simulation-evidence adds gpiote.py and a27-file
+runtime inventory (20 modules/7 schemas). The separate GPIOTE schema records
+three event bits, INTEN, three CONFIG and two GPIO IN values per paused snapshot,
+plus pin_level in guest ISR samples. Raw spans bind all nine numeric fields.
+Allow at most4 exact machine lifecycle INFO lines before each value; retain
+those bytes, bounded4096B per model span. Unknowns and failed native outcomes
+stay unchanged across full/filter/empty/Markdown views. This is representation
+validation, never native firmware-policy replay or physical qualification.
+Keep0.17 EGU and earlier versions explicit, and permit0.18 HIL producers for
+saved instrument domains. Shared load/thermal bytes must remain identical.
+Local evidence D:/Code/tmp/hil-trace-gpiote-0180-20261103; no publication,
+Toolkit/lock/plugin change or device access is included in this phase.
+
+Pre-commit checks: Python3.11/3.13 each673 passed/two existing platform skips;
+Ruff/format/offline lock and both installed smoke checks pass. The lock audit
+caught Ruff's accidentally replaced version; restore original dependency bytes.
+For scripts/package_smoke.py under Python -I, use the reviewed explicit scripts
+path/runpy bootstrap so instrument_smoke resolves. The first wrapper failed
+before creating output; preserve that failure and resume only incomplete steps.
+
 Current local0.17 on feat/egu-simulation-evidence adds offline EGU views;
 the local0.16 RTC notes below remain history. Read the EGU section in
 docs/simulation.md before changing this path.

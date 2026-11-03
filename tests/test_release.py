@@ -40,6 +40,8 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, ver
     """Independent minimal distribution fixture; contents are never imported."""
     metadata = f"embedded_trace-{version}.dist-info/"
     wheel = {"embedded_trace/" + name: b"# synthetic module\n" for name in MODULES}
+    if tuple(map(int, version.split("."))) >= (0, 18, 0):
+        wheel["embedded_trace/gpiote.py"] = b"# synthetic GPIOTE\n"
     if tuple(map(int, version.split("."))) >= (0, 17, 0):
         wheel["embedded_trace/egu.py"] = b"# synthetic EGU\n"
     if tuple(map(int, version.split("."))) >= (0, 16, 0):
@@ -134,6 +136,32 @@ def test_rtc_release_accepts_complete_new_payload(tmp_path):
     release.create_manifest(tmp_path, "0.16.0", REVISION)
     result = release.verify(tmp_path, REVISION)
     assert result["ok"] and result["wheel_members"] == 30 and result["source_members"] == 29
+
+
+def test_gpiote_release_accepts_exact_new_payload(tmp_path):
+    archives(tmp_path, version="0.18.0")
+    release.create_manifest(tmp_path, "0.18.0", REVISION)
+    assert release.verify(tmp_path)["ok"]
+
+
+def test_gpiote_release_requires_new_module(tmp_path):
+    archives(
+        tmp_path,
+        version="0.18.0",
+        mutate=lambda wheel, source: wheel.pop("embedded_trace/gpiote.py"),
+    )
+    with pytest.raises(ValueError, match="Unexpected/missing wheel"):
+        release.create_manifest(tmp_path, "0.18.0", REVISION)
+
+
+def test_previous_release_rejects_gpiote_module(tmp_path):
+    archives(
+        tmp_path,
+        version="0.17.0",
+        mutate=lambda wheel, source: wheel.update({"embedded_trace/gpiote.py": b"# extra\n"}),
+    )
+    with pytest.raises(ValueError, match="Unexpected/missing wheel"):
+        release.create_manifest(tmp_path, "0.17.0", REVISION)
 
 
 def test_egu_release_accepts_exact_new_payload(tmp_path):

@@ -260,6 +260,27 @@ source directory is removed. Flash diagnostics, qualified/failed outcomes and
 false coverage/security claims remain unchanged; complete SMP, debug attachment,
 Flash commands or physical behavior cannot be inferred from this view.
 
+## GPIOTE evidence in local 0.18.0
+
+Trace accepts the distinct sim-runner0.13 GPIOTE plan/report schemas. Bind plan,
+script, profile, labels, clock and fault request before importing saved evidence.
+`gpiote_evidence`, `gpiote_observation_spans`, `gpiote_sample_spans` and
+`gpiote_fault_span` preserve native outcomes, errors and unknowns across full,
+sample-filtered, empty, Markdown and moved-timeline views.
+
+Each of18 paused observations records three event bits, interrupt mask, three
+CONFIG registers and two GPIO input values, with raw offset/length/hash/base64.
+Seven-field UART samples include pin_level. Representation validation checks
+these bytes and bounded types without deciding firmware correctness. At most
+four exact Renode machine paused/resumed INFO lines may precede each numeric
+value; retain them inside a maximum4096-byte raw model span. Missing values,
+unexpected INFO and rehashed contradictory representations fail.
+
+Mask-channel2 and wrong-polarity controls retain native nominal failures even
+when effects are observed; incomplete captures remain unknown. Output tasks,
+PORT/SENSE, PPI, electrical behavior, physical timing and hardware identity are
+not established. The module adds one runtime file;0.17 inventories reject it.
+
 ## EGU evidence in local 0.17.0
 
 Trace accepts sim-runner 0.12.0's distinct EGU plan/report and fixed

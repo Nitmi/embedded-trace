@@ -162,6 +162,8 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
         runtime_files.add("embedded_trace/rtc.py")
     if tuple(map(int, version.split("."))) >= (0, 17, 0):
         runtime_files.add("embedded_trace/egu.py")
+    if tuple(map(int, version.split("."))) >= (0, 18, 0):
+        runtime_files.add("embedded_trace/gpiote.py")
     require(set(wheel) == runtime_files | expected_metadata, "Unexpected/missing wheel files")
     metadata = email.parser.BytesParser().parsebytes(wheel[prefix + "METADATA"])
     require(

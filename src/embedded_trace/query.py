@@ -25,6 +25,7 @@ from .common import (
     text,
 )
 from .egu import EGU_FIELDS, EGU_PROFILE, egu_summary, validate_egu_spans
+from .gpiote import GPIOTE_FIELDS, GPIOTE_PROFILE, gpiote_summary, validate_gpiote_spans
 from .rtc import RTC_FIELDS, RTC_PROFILE, rtc_summary, validate_rtc_spans
 from .simulation import (
     FAULT_FIELDS,
@@ -497,6 +498,23 @@ def validate(document: dict) -> None:
                     "sensor declarations/clock/qualification changed",
                 )
                 validate_sensor_spans(source)
+            if source["profile"] == GPIOTE_PROFILE:
+                expected = gpiote_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["virtual_time"] == report["virtual_time"]
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "GPIOTE declarations/clock/qualification changed",
+                )
+                validate_gpiote_spans(
+                    source,
+                    b"".join(
+                        decode_base64(e["payload"]["raw_base64"])
+                        for e in local
+                        if e["kind"] == "line"
+                    ),
+                )
             if source["profile"] == EGU_PROFILE:
                 expected = egu_summary(report)
                 require(
@@ -633,6 +651,7 @@ def simulation_sources(document: dict) -> dict:
         *WATCHDOG_FIELDS,
         *RTC_FIELDS,
         *EGU_FIELDS,
+        *GPIOTE_FIELDS,
         *WASM_FIELDS,
     )
     return {

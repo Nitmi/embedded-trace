@@ -1,6 +1,12 @@
 # Embedded Trace
 
-Local **0.17.0** adds [EGU evidence views](docs/simulation.md#egu-evidence-in-local-0170).
+Local **0.18.0** adds [GPIOTE evidence views](docs/simulation.md#gpiote-evidence-in-local-0180).
+Preserve raw input levels, CONFIG, event/IRQ declarations and byte spans across
+full, filtered, empty and Markdown views. Native failures and unknowns remain
+unchanged; offline representation checks do not replay firmware policy or
+establish physical timing, board identity or hardware authorization.
+
+Version **0.17.0** adds [EGU evidence views](docs/simulation.md#egu-evidence-in-local-0170).
 Ordered PRE/POST registers, guest IRQ samples and fault markers retain their
 original bytes, native failures and unknowns in full, filtered and empty views.
 Bounded asynchronous lifecycle logs stay inside their original observation spans.
