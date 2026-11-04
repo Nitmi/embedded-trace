@@ -105,6 +105,7 @@ def load(path, sha):
             "0.17.0",
             "0.18.0",
             "0.19.0",
+            "0.20.0",
         )
         and bundle["scope"] == "host_only_saved_waveform_import"
         and bundle["native_recomputation_recorded"] is True

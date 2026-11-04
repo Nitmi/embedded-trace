@@ -55,6 +55,7 @@ from .simulation import (
     watchdog_summary,
 )
 from .timeline import ORDERING, SAFETY
+from .uarte_dma import UARTE_FIELDS, UARTE_PROFILE, uarte_summary, validate_uarte_spans
 
 
 def reference(value: object, maximum: int) -> None:
@@ -499,6 +500,23 @@ def validate(document: dict) -> None:
                     "sensor declarations/clock/qualification changed",
                 )
                 validate_sensor_spans(source)
+            if source["profile"] == UARTE_PROFILE:
+                expected = uarte_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["virtual_time"] == report["virtual_time"]
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "UARTE declarations/clock/qualification changed",
+                )
+                validate_uarte_spans(
+                    source,
+                    b"".join(
+                        decode_base64(e["payload"]["raw_base64"])
+                        for e in local
+                        if e["kind"] == "line"
+                    ),
+                )
             if source["profile"] == PPI_PROFILE:
                 expected = ppi_summary(report)
                 require(
@@ -671,6 +689,7 @@ def simulation_sources(document: dict) -> dict:
         *EGU_FIELDS,
         *GPIOTE_FIELDS,
         *PPI_FIELDS,
+        *UARTE_FIELDS,
         *WASM_FIELDS,
     )
     return {

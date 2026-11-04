@@ -30,6 +30,7 @@ from .simulation import (
     WATCHDOG_PROFILE,
 )
 from .timeline import SAFETY
+from .uarte_dma import UARTE_FIELDS, UARTE_PROFILE
 
 MAX_REPORT_BYTES = 1024 * 1024
 PREVIEW_CHARACTERS = 512
@@ -177,6 +178,11 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                 **(
                     {key: source[key] for key in EGU_FIELDS}
                     if source.get("profile") == EGU_PROFILE
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in UARTE_FIELDS}
+                    if source.get("profile") == UARTE_PROFILE
                     else {}
                 ),
                 **(

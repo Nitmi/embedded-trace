@@ -365,3 +365,38 @@ simulation versions stay explicit; instrument-domain readers also accept HIL0.19
 without changing native evaluation semantics. Shared load/thermal protocol bytes
 must remain identical to HIL. Runtime dependencies stay empty; measure warm
 validation costs separately from startup, cold I/O and native emulator RSS.
+
+## UARTE EasyDMA RX in local 0.20.0
+
+The separate `embedded-sim-runner.uarte-dma-report.v1` adapter imports fixed
+sim-runner 0.15.0 `nrf52840-uarte-dma-v1` plans and results. Preserve native
+status/errors, nominal verdict, fault request/effect, nulls and qualifications.
+Successful import is not a successful simulation. HIL 0.20 producers also
+remain supported in the four saved instrument domains.
+
+Each of sixteen paused model observations binds twelve numeric fields:
+ENABLE, RXD.PTR/MAXCNT/AMOUNT, ENDRX/RXDRDY/RXSTARTED/RXTO, INTEN,
+low guard, buffer word and high guard. Guest records bind sequence, word,
+amount and both guards to exact UART bytes. Descriptor fault markers retain
+their raw span between indices 3 and 4. Snapshot offsets, lengths, SHA-256 and
+base64 remain bound; at most four exact lifecycle INFO lines per field fit
+within the 4096-byte span limit. Missing, reordered, contradictory, oversized
+and invalid typed fields fail, including after outer hashes are recomputed.
+
+This adapter validates representations and provenance. It does not decide
+whether a descriptor, guard or sample should have passed native firmware
+policy. Wrong BUILD may retain model spans with no parsed samples and an
+unknown effect. A fault that Sim marks observed still retains failed capture
+status. A source-level summary stays present even in an empty filtered view.
+
+Full, sample-filtered, empty, Markdown and relocated views preserve these
+fields and source conclusions. Saved views open only their selected timeline,
+not original runtime/firmware/reports, and start no processes or network.
+The recorded host window is not a UART-byte timestamp or synchronized clock.
+
+The local wheel contains 29 runtime files (22 modules / 7 schemas), including
+the new mandatory uarte_dma.py; older release inventories reject that module.
+Physical DMA, UART electrical behavior, physical/event timing and complete
+model coverage labels remain false. Guard evidence is not enforced memory
+protection. Runtime dependencies stay empty; measure warm reader costs
+separately from native RSS, cold I/O and interpreter startup.

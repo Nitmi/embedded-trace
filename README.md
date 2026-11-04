@@ -153,3 +153,11 @@ Import Sim0.14 TIMER0/PPI/GPIOTE evidence with raw register/sample/fault spans,
 and preserve native failures and unknowns through full, filtered and Markdown
 views. See [simulation evidence](docs/simulation.md). This is offline evidence
 validation; precise event timing and physical qualification remain unverified.
+
+## Local 0.20 UARTE EasyDMA RX views
+
+Import Sim0.15 descriptor, event, guarded SRAM and guest RX evidence with raw
+byte spans. Preserve short-buffer/pointer-shift failures and unknown identity
+through full, filtered, empty and Markdown views. See
+[simulation evidence](docs/simulation.md#uarte-easydma-rx-in-local-0200).
+The reader remains offline and does not replay native firmware policy.

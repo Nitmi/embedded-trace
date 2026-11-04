@@ -3,6 +3,21 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.20 on feat/uarte-dma-simulation-evidence adds uarte_dma.py,
+29 runtime files (22 modules/7 schemas). Preserve all12 paused numeric fields
+and raw guest word/amount/guard spans, descriptor fault markers and native
+failures/unknowns. Representation checking is not native policy replay.
+Allow at most4 exact lifecycle INFO lines per field within4096-byte model spans.
+Full/filter/empty/Markdown/moved views retain original source conclusions.
+HIL0.20 support covers saved instrument/waveform/load/thermal domains; shared
+load/thermal bytes must remain identical between repositories.
+Evidence D:/Code/tmp/hil-trace-uarte-dma-0200-20261104; qualification in progress.
+No publication, Toolkit/plugin/lock changes, native execution by Trace or hardware.
+
+Initial lint caught two overlong test-fixture lines; split comment/bytes without
+altering evidence. A no-op README patch guessed the wrong title and applied
+nothing; append only using observed context. Keep the original command receipts.
+
 Current local0.19 on feat/ppi-simulation-evidence adds ppi.py:28 runtime files
 (21 modules/7 schemas). PPI representation validation binds14 numeric register
 fields per model span and raw A/B/sentinel samples. Native Sim policy remains

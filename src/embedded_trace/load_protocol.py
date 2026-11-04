@@ -584,6 +584,7 @@ def project(manifest_blob, blobs, version):
             "0.17.0",
             "0.18.0",
             "0.19.0",
+            "0.20.0",
         ),
         "unsupported HIL load producer",
     )
