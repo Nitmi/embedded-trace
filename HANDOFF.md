@@ -3,6 +3,27 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+Current local0.19 on feat/ppi-simulation-evidence adds ppi.py:28 runtime files
+(21 modules/7 schemas). PPI representation validation binds14 numeric register
+fields per model span and raw A/B/sentinel samples. Native Sim policy remains
+authoritative, including failed nominal regressions and unknown fault effects.
+Allow at most4 exact lifecycle INFO lines before each register value within
+4096-byte spans. Retain source conclusions through full/filter/empty/Markdown
+and relocated views; never claim physical timing or event alignment.
+Explicit0.19 HIL producer support preserves all saved instrument domains.
+Shared load/thermal files must remain byte-identical across repositories.
+Local qualification: D:/Code/tmp/hil-trace-ppi-0190-20261104. No publication,
+Toolkit/lock/plugin change, runtime execution by Trace or physical access.
+
+Python3.11/3.13 each707 tests pass/two existing platform skips; both isolated
+installed smokes verify28 runtime files/138 CLI commands. Initial focused
+negative test assigned an already-equal sample value; XOR now proves mutation.
+Ruff caught an overlong UART f-string; split literals without changing bytes.
+Preserve original failed checks. Package smoke under -I requires explicit
+scripts path/runpy bootstrap; release inventory must require ppi.py at0.19,
+reject missing/new modules at older versions, and preserve zero runtime deps.
+Windows rg uses -g filters rather than literal wildcard filename arguments.
+
 Current local0.18 on feat/gpiote-simulation-evidence adds gpiote.py and a27-file
 runtime inventory (20 modules/7 schemas). The separate GPIOTE schema records
 three event bits, INTEN, three CONFIG and two GPIO IN values per paused snapshot,

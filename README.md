@@ -146,3 +146,10 @@ The lock binds development dependencies; installed runtime code uses only the
 standard library. [Release 0.7.0](https://github.com/Nitmi/embedded-trace/releases/tag/v0.7.0)
 provides a wheel, source archive, source-bound manifest and checksums. Follow the
 installation guide to authenticate all four assets before installing the wheel.
+
+## Local 0.19 PPI evidence views
+
+Import Sim0.14 TIMER0/PPI/GPIOTE evidence with raw register/sample/fault spans,
+and preserve native failures and unknowns through full, filtered and Markdown
+views. See [simulation evidence](docs/simulation.md). This is offline evidence
+validation; precise event timing and physical qualification remain unverified.

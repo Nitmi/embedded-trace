@@ -333,3 +333,35 @@ entire recorded host run window. No calibrated/electrical/physical measurement,
 clock synchronization or real board acceptance follows from these declarations.
 Whole timeline validation precedes filters; an empty page has the same input
 verification cost. Sixteen samples/four spans bound the added projection cost.
+# PPI evidence in local 0.19.0
+
+The independent `embedded-sim-runner.ppi-report.v1` adapter imports the fixed
+sim-runner0.14.0 `nrf52840-ppi-v1` plan/report. It preserves native success,
+failure, missing evidence and unknown fault effects. A successful import, query
+or Markdown render does not turn a failed capture into a passed regression.
+
+Sixteen ordered PRE/POST observations retain fourteen exact register names:
+timer event/prescaler/compare, channel mask, EEP/TEP/FORK, three GPIOTE configs,
+both GPIO OUT and both GPIO IN values. Their stdout offsets, lengths, hashes and
+raw base64 are bound to the saved bytes. Guest samples retain sequence and
+main/fork/sentinel values; fault markers retain their raw span between indices3
+and4. Up to four exact native paused/resumed INFO lines per value are preserved
+within the4096-byte model-span bound. Other logs and contradictions are errors.
+
+Validation covers representation, bounded structure, provenance and raw bindings;
+it never replays native firmware policy or launches Sim. Valid but unusual
+register/sample values and recorded failures remain unchanged. Native PPI,
+event-time alignment, physical timing and model-completeness labels stay false.
+The host window is not an event timestamp or verified synchronized clock.
+
+Full, sample-filtered, empty and Markdown views retain the source-level PPI
+declarations and failure outcome. Saved timeline inspection opens only the
+selected timeline, without original report/runtime/firmware inputs, subprocesses
+or network. Rehashing a contradictory view cannot make it internally consistent.
+
+The local0.19 wheel contains28 runtime files (21 modules and7 schemas). The new
+module is mandatory for0.19 and rejected in earlier release inventories. Older
+simulation versions stay explicit; instrument-domain readers also accept HIL0.19
+without changing native evaluation semantics. Shared load/thermal protocol bytes
+must remain identical to HIL. Runtime dependencies stay empty; measure warm
+validation costs separately from startup, cold I/O and native emulator RSS.

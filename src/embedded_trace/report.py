@@ -9,6 +9,7 @@ from . import __version__
 from .common import require, write_new_bytes
 from .egu import EGU_FIELDS, EGU_PROFILE
 from .gpiote import GPIOTE_FIELDS, GPIOTE_PROFILE
+from .ppi import PPI_FIELDS, PPI_PROFILE
 from .query import load, select_events
 from .rtc import RTC_FIELDS, RTC_PROFILE
 from .simulation import (
@@ -176,6 +177,11 @@ def report(path: Path, sha256: str, output: Path, **filters) -> dict:
                 **(
                     {key: source[key] for key in EGU_FIELDS}
                     if source.get("profile") == EGU_PROFILE
+                    else {}
+                ),
+                **(
+                    {key: source[key] for key in PPI_FIELDS}
+                    if source.get("profile") == PPI_PROFILE
                     else {}
                 ),
                 **(
