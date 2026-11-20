@@ -272,7 +272,7 @@ def test_uarte_failed_identity_preserves_model_without_guest_or_fault_claim(tmp_
     assert source["uarte_evidence"]["fault"]["effect_observed"] is None
 
 
-@pytest.mark.parametrize("version", ["0.14.0", "0.16.0", "99.0.0"])
+@pytest.mark.parametrize("version", ["0.14.0", "0.17.0", "99.0.0"])
 def test_uarte_rejects_unselected_plan_versions(tmp_path, version):
     path = uarte_report(tmp_path / "native")
     native = json.loads(path.read_bytes())

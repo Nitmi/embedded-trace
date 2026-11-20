@@ -24,6 +24,7 @@ from .common import (
     require,
     text,
 )
+from .ecb import ECB_FIELDS, ECB_PROFILE, ecb_summary, validate_ecb_spans
 from .egu import EGU_FIELDS, EGU_PROFILE, egu_summary, validate_egu_spans
 from .gpiote import GPIOTE_FIELDS, GPIOTE_PROFILE, gpiote_summary, validate_gpiote_spans
 from .ppi import PPI_FIELDS, PPI_PROFILE, ppi_summary, validate_ppi_spans
@@ -500,6 +501,23 @@ def validate(document: dict) -> None:
                     "sensor declarations/clock/qualification changed",
                 )
                 validate_sensor_spans(source)
+            if source["profile"] == ECB_PROFILE:
+                expected = ecb_summary(report)
+                require(
+                    json.dumps({k: source.get(k) for k in expected}, sort_keys=True)
+                    == json.dumps(expected, sort_keys=True)
+                    and source["virtual_time"] == report["virtual_time"]
+                    and source["warnings"].get("model_coverage_incomplete") == 1,
+                    "ECB declarations/clock/qualification changed",
+                )
+                validate_ecb_spans(
+                    source,
+                    b"".join(
+                        decode_base64(e["payload"]["raw_base64"])
+                        for e in local
+                        if e["kind"] == "line"
+                    ),
+                )
             if source["profile"] == UARTE_PROFILE:
                 expected = uarte_summary(report)
                 require(
@@ -690,6 +708,7 @@ def simulation_sources(document: dict) -> dict:
         *GPIOTE_FIELDS,
         *PPI_FIELDS,
         *UARTE_FIELDS,
+        *ECB_FIELDS,
         *WASM_FIELDS,
     )
     return {

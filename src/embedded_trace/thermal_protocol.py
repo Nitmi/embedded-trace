@@ -575,6 +575,7 @@ def project(manifest_blob, blobs, source_blobs, version):
             "0.18.0",
             "0.19.0",
             "0.20.0",
+            "0.21.0",
         ),
         "unsupported HIL thermal producer",
     )

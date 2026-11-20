@@ -1,5 +1,10 @@
 # Embedded Trace
 
+Local **0.21.0** adds [ECB AES128 evidence views](docs/simulation-ecb.md).
+Full, filtered, empty and moved views retain 32-field raw snapshots, exact
+ciphertext bytes, native failures and unknowns. Offline byte validation does
+not rerun AES or establish cryptographic security or physical timing.
+
 Local **0.18.0** adds [GPIOTE evidence views](docs/simulation.md#gpiote-evidence-in-local-0180).
 Preserve raw input levels, CONFIG, event/IRQ declarations and byte spans across
 full, filtered, empty and Markdown views. Native failures and unknowns remain

@@ -24,6 +24,30 @@ VERSION = "0.1.0"
 REVISION = "a" * 40
 
 
+def test_ecb_release_accepts_exact_new_payload(tmp_path):
+    archives(tmp_path, version="0.21.0")
+    release.create_manifest(tmp_path, "0.21.0", REVISION)
+    assert release.verify(tmp_path, REVISION)["ok"]
+
+
+def test_ecb_release_requires_new_module(tmp_path):
+    archives(
+        tmp_path, version="0.21.0", mutate=lambda wheel, source: wheel.pop("embedded_trace/ecb.py")
+    )
+    with pytest.raises(ValueError):
+        release.create_manifest(tmp_path, "0.21.0", REVISION)
+
+
+def test_previous_release_rejects_ecb_module(tmp_path):
+    archives(
+        tmp_path,
+        version="0.20.0",
+        mutate=lambda wheel, source: wheel.update({"embedded_trace/ecb.py": b"# extra\n"}),
+    )
+    with pytest.raises(ValueError):
+        release.create_manifest(tmp_path, "0.20.0", REVISION)
+
+
 def test_uarte_release_accepts_exact_new_payload(tmp_path):
     archives(tmp_path, version="0.20.0")
     release.create_manifest(tmp_path, "0.20.0", REVISION)
@@ -92,6 +116,8 @@ def archives(directory, *, mutate=None, extra_wheel=None, extra_source=None, ver
     """Independent minimal distribution fixture; contents are never imported."""
     metadata = f"embedded_trace-{version}.dist-info/"
     wheel = {"embedded_trace/" + name: b"# synthetic module\n" for name in MODULES}
+    if tuple(map(int, version.split("."))) >= (0, 21, 0):
+        wheel["embedded_trace/ecb.py"] = b"# synthetic ECB\n"
     if tuple(map(int, version.split("."))) >= (0, 20, 0):
         wheel["embedded_trace/uarte_dma.py"] = b"# synthetic UARTE\n"
     if tuple(map(int, version.split("."))) >= (0, 19, 0):

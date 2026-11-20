@@ -3,6 +3,16 @@
 Read this file and AGENTS.md before a new task. The active workspace HANDOFF.md
 and desktop development plan track cross-repository progress.
 
+2026-11-20 local0.21 ECB integration on feat/ecb-simulation-evidence.
+New ecb.py ->30 runtime files (23 modules/7 schemas). Preserve32 uint32 model
+fields, exact16-byte ciphertext strings and ordered raw spans. Model spans
+allow16KiB for32 fields with4 lifecycle INFO lines each; guest spans remain256B.
+No native policy replay/AES computation/security qualification. Reuse13 sealed
+Sim results; full regressions/installed qualification in progress at
+D:/Code/tmp/hil-trace-ecb-0210-20261120. No hardware or publication/Toolkit changes.
+Final receipts remain external to the source-bound commit. Initial sibling test
+import retained ecb_dma suffix; corrected to ecb, original failure retained.
+
 Current local0.20 on feat/uarte-dma-simulation-evidence adds uarte_dma.py,
 29 runtime files (22 modules/7 schemas). Preserve all12 paused numeric fields
 and raw guest word/amount/guard spans, descriptor fault markers and native

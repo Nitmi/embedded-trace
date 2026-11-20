@@ -168,6 +168,8 @@ def payloads(snapshots: dict[str, bytes], version: str) -> tuple[dict, dict]:
         runtime_files.add("embedded_trace/ppi.py")
     if tuple(map(int, version.split("."))) >= (0, 20, 0):
         runtime_files.add("embedded_trace/uarte_dma.py")
+    if tuple(map(int, version.split("."))) >= (0, 21, 0):
+        runtime_files.add("embedded_trace/ecb.py")
     require(set(wheel) == runtime_files | expected_metadata, "Unexpected/missing wheel files")
     metadata = email.parser.BytesParser().parsebytes(wheel[prefix + "METADATA"])
     require(

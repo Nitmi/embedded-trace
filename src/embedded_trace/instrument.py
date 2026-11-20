@@ -145,6 +145,7 @@ def load(path, sha):
             "0.18.0",
             "0.19.0",
             "0.20.0",
+            "0.21.0",
         )
         and bundle["scope"] == "host_only_saved_instrument_import"
         and bundle["native_recomputation_recorded"] is True
